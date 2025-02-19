@@ -6,8 +6,8 @@ import platform
 cam = cv2.VideoCapture("E:\\Dataset\\dataset_1\\keyframe_1\\data\\rgb.mp4")
 
 try:
-    if not os.path.exists("./data"):
-        os.makedirs("./data")
+    if not os.path.exists("../Data"):
+        os.makedirs("../Data")
 
 except OSError:
     print("Error: Creating directory. " + 'data')

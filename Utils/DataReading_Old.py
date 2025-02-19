@@ -6,9 +6,10 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class DataReading(Dataset):
-    def __init__(self, root, transform=None):
+    def __init__(self, root, transform=None, target_transform=None):
         self.root = root
         self.transform = transform
+        self.target_transform = target_transform
         self.data_pairs = []
 
         for main_folder in sorted(os.listdir(root)):
@@ -52,12 +53,13 @@ class DataReading(Dataset):
         return torch.tensor(mesh.vertices,dtype=torch.float32)
 
     def __getitem__(self, index):
-        img1_path, depth1_path, img2_path, depth2_path, obj_file = self.data_pairs[index]
+        img1_path, img2_path, obj_file = self.data_pairs[index]
 
         image1 = Image.open(img1_path).convert('RGB')
         #depth1 = Image.open(depth1_path)
         image2 = Image.open(img2_path).convert('RGB')
         #depth2 = Image.open(depth2_path)
+
         if self.transform:
             image1 = self.transform(image1)
             #depth1 = self.transform(depth1)
@@ -65,4 +67,7 @@ class DataReading(Dataset):
             #depth2 = self.transform(depth2)
 
         point_cloud = self.load_point_cloud(obj_file)
+        if self.target_transform:
+            point_cloud = self.target_transform(point_cloud)
+
         return image1, image2, point_cloud
