@@ -1,46 +1,53 @@
+import json
 import os
 import torch
 import trimesh
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
+import numpy as np
+import open3d as o3d
 
 
 class DataReading(Dataset):
-    def __init__(self, root, transform=None):
-        self.root = root
+    def __init__(self,photo_location, point_cloud_location, transform=None, target_transform=None):
+        self.photo_location = photo_location
+        self.point_cloud_location = point_cloud_location
         self.transform = transform
+        self.target_transform = target_transform
         self.data_pairs = []
+        self.frame_data = os.path.join(self.point_cloud_location, 'data/frame_data/')
 
-        for main_folder in sorted(os.listdir(root)):
-            main_folder_path = os.path.join(root, main_folder)
-            if not os.path.isdir(main_folder_path):
-                continue
+        obj_file = os.path.join(self.point_cloud_location, 'point_cloud.obj')
+        if not os.path.isfile(obj_file):
+            return None
 
-            for keyframe_folder in sorted(os.listdir(main_folder_path)):
-                keyframe_folder_path = os.path.join(main_folder_path, keyframe_folder)
-                if not os.path.isdir(keyframe_folder_path):
-                    continue
+        images = sorted([f for f in os.listdir(photo_location) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
+        depths = sorted([f for f in os.listdir(photo_location) if f.lower().endswith('.tiff')])
+        frame = sorted([os.path.join(self.frame_data, f)
+                        for f in os.listdir(self.frame_data)
+                        if f.lower().endswith('.json')])
 
-                obj_file = os.path.join(keyframe_folder_path, 'point_cloud.obj')
-                if not os.path.isfile(obj_file):
-                    continue
+        if len(images) % 2 != 0:
+            print(f"Warning: odd number of images in {photo_location}")
+            images = images[:-1]
 
-                images = sorted([f for f in os.listdir(keyframe_folder_path) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
-                depths = sorted([f for f in os.listdir(keyframe_folder_path) if f.lower().endswith('.tiff')])
+        left_images = sorted([img for img in images if img.startswith("left_frame")])
+        right_images = sorted([img for img in images if img.startswith("right_frame")])
 
-                if len(images) % 2 != 0:
-                    print(f"Warning: odd number of images in {keyframe_folder_path}")
-                    images = images[:-1]
+        if len(depths) % 2 != 0:
+            print(f"Warning: odd number of depths in {photo_location}")
+            depths = depths[:-1]
 
-                if len(depths) % 2 != 0:
-                    print(f"Warning: odd number of depths in {keyframe_folder_path}")
-                    depths = depths[:-1]
+        left_depths = sorted([depth for depth in depths if depth.startswith("left_depth")])
+        right_depths = sorted([depth for depth in depths if depth.startswith("right_depth")])
 
-                img1_path = os.path.join(keyframe_folder_path, images[0])
-                #depth1_path = os.path.join(keyframe_folder_path, depths[0])
-                img2_path = os.path.join(keyframe_folder_path, images[1])
-                #depth2_path = os.path.join(keyframe_folder_path, depths[1])
-                self.data_pairs.append((img1_path, img2_path, obj_file))
+
+        for i, left_img in enumerate(left_images):
+            img1_path = os.path.join(photo_location, left_img)
+            depth1_path = os.path.join(photo_location, left_depths[i])
+            img2_path = os.path.join(photo_location, right_images[i])
+            depth2_path = os.path.join(photo_location, right_depths[i])
+            self.data_pairs.append((img1_path, depth1_path, img2_path, depth2_path, obj_file,frame[i]))
 
         print(f"Total pairs found: {len(self.data_pairs)}")
 
@@ -51,18 +58,47 @@ class DataReading(Dataset):
         mesh = trimesh.load(path)
         return torch.tensor(mesh.vertices,dtype=torch.float32)
 
+    def load_camera(self, path):
+        with open(path,'r') as f:
+            data=json.load(f)
+
+        pose_matrix = np.array(data['camera-pose'])[:3, :3]
+
+        rotation_matrix = torch.tensor(pose_matrix,dtype=torch.float32)
+
+        return rotation_matrix
+
+    def rotate_point_cloud(self , points,rotation_matrix):
+        return torch.matmul(points,rotation_matrix.T)
+
+    def display_point_cloud(self, points):
+        if isinstance(points,torch.Tensor):
+            point_cloud = points.cpu().numpy()
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(points)
+
+        # Visualize
+        o3d.visualization.draw_geometries([pcd])
+
     def __getitem__(self, index):
-        img1_path, depth1_path, img2_path, depth2_path, obj_file = self.data_pairs[index]
+        img1_path, depth1_path, img2_path, depth2_path, obj_file, frame = self.data_pairs[index]
 
         image1 = Image.open(img1_path).convert('RGB')
-        #depth1 = Image.open(depth1_path)
+        depth1 = Image.open(depth1_path)
         image2 = Image.open(img2_path).convert('RGB')
-        #depth2 = Image.open(depth2_path)
+        depth2 = Image.open(depth2_path)
         if self.transform:
             image1 = self.transform(image1)
-            #depth1 = self.transform(depth1)
+            depth1 = self.transform(depth1)
             image2 = self.transform(image2)
-            #depth2 = self.transform(depth2)
+            depth2 = self.transform(depth2)
 
         point_cloud = self.load_point_cloud(obj_file)
-        return image1, image2, point_cloud
+        rotation_matrix = self.load_camera(frame)
+        rotated_cloud = self.rotate_point_cloud(point_cloud,rotation_matrix)
+
+        #self.display_point_cloud(point_cloud.shape)
+        #self.display_point_cloud(rotated_cloud.shape)
+
+        return image1, depth1, image2, depth2, rotated_cloud

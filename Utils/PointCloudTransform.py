@@ -2,13 +2,15 @@ import torch
 import random
 import numpy as np
 
+
 class PointCloudTransform:
-    def __init__(self,rotation=False,scaling=False,translation=False,noise=False,normalize=False):
+    def __init__(self,rotation=False,scaling=False,translation=False,noise=False,normalize=False,size=512):
         self.rotation = rotation
         self.scaling = scaling
         self.translation = translation
         self.noise = noise
         self.normalize = normalize
+        self.size = size
 
     def __call__(self, points):
         if self.rotation:
@@ -17,10 +19,6 @@ class PointCloudTransform:
                                         [np.sin(angle), np.cos(angle), 0],
                                         [0, 0, 1]])
             points = torch.tensor(np.dot(points.numpy(), rotation_matrix.T))
-
-        if self.scaling:
-            scale = np.random.uniform(0.5, 1.5)
-            points = points * scale
 
         if self.translation:
             translation = torch.randn(3)*.2
@@ -31,10 +29,11 @@ class PointCloudTransform:
             points = points + noise
 
         if self.normalize:
-            centroid = torch.mean(points, dim=0)
-            points = points - centroid
+            min_vals = points.min(axis=0).values
+            max_vals = points.max(axis=0).values
+            points = (points - min_vals) / (max_vals - min_vals)
 
-            max_dist = torch.max(torch.norm(points, dim=1))
-            points = points / max_dist
+            if self.scaling:
+                points = points * self.size
 
         return points

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.utils.checkpoint as cp
 
 class BasicBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
@@ -59,10 +60,10 @@ class Encoder(nn.Module):
         x = self.bn1(x)
         x = self.leakyRelu(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = cp.checkpoint(self.layer1,x, use_reentrant=False)
+        x = cp.checkpoint(self.layer2,x, use_reentrant=False)
+        x = cp.checkpoint(self.layer3,x, use_reentrant=False)
+        x = cp.checkpoint(self.layer4,x, use_reentrant=False)
 
         x = self.conv5(x)
         x = self.leakyRelu2(x)
