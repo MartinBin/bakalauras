@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: bakis_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=bakis_db
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
+    name: bakis_mongodb_data 
