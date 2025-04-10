@@ -6,6 +6,10 @@ from torch.utils.data import DataLoader
 from Trainer import Trainer
 import argparse
 import sys
+import os
+import torch
+from PIL import Image
+import numpy as np
 
 
 def main(args):
@@ -66,24 +70,45 @@ def main(args):
                     target_point_cloud=target_point_cloud,
                     save_path=f"./predictions/sample_{i}"
                 )
+
+                left,right=model.getUnetOutput(left_images,right_images)
+
+                unet_dir = os.path.join('./predictions', 'unet_outputs')
+                os.makedirs(unet_dir, exist_ok=True)
                 
-                # Accumulate metrics if available
+                if torch.is_tensor(left):
+                    left_unet = left.detach().cpu().numpy()
+                if torch.is_tensor(right):
+                    right_unet = right.detach().cpu().numpy()
+                
+                left_unet = np.transpose(left_unet[0], (1, 2, 0))
+                right_unet = np.transpose(right_unet[0], (1, 2, 0))
+                
+                left_unet = np.clip(left_unet * 255, 0, 255).astype(np.uint8)
+                right_unet = np.clip(right_unet * 255, 0, 255).astype(np.uint8)
+                
+                left_unet_img = Image.fromarray(left_unet)
+                right_unet_img = Image.fromarray(right_unet)
+                
+                left_unet_path = os.path.join(unet_dir, f'left_unet.png')
+                right_unet_path = os.path.join(unet_dir, f'right_unet.png')
+                
+                left_unet_img.save(left_unet_path)
+                right_unet_img.save(right_unet_path)
+                
                 if metrics:
                     total_mse += metrics['mse']
                     total_mae += metrics['mae']
                     total_chamfer += metrics['chamfer']
                     num_samples += 1
                     
-                    # Print metrics for this sample
                     print(f"\nSample {i} Metrics:")
                     print(f"MSE Loss: {metrics['mse']:.6f}")
                     print(f"MAE Loss: {metrics['mae']:.6f}")
                     print(f"Chamfer Distance: {metrics['chamfer']:.6f}")
                 
-                # Ask for user input to continue to next sample
                 input("Press Enter to continue to next sample...")
             
-            # Print average metrics across all samples
             if num_samples > 0:
                 print("\nAverage Metrics Across All Samples:")
                 print(f"Average MSE Loss: {total_mse / num_samples:.6f}")

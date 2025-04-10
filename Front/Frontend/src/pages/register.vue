@@ -30,7 +30,7 @@ const router = useRouter()
 
 const register = async () => {
   try {
-    await axios.post('http://localhost:8080/api/auth/registration/', {
+    await axios.post('http://localhost:8000/api/auth/registration/', {
       username: form.value.username,
       email: form.value.email,
       password: form.value.password,

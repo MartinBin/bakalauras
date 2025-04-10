@@ -30,6 +30,8 @@ Checkpoints/
 Trained_Models/
 predictions/
 outputs/
+Model Backups/
+media/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

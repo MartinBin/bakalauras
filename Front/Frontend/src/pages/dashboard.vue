@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import axios from 'axios'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
-import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
 
 const leftImage = ref<File | null>(null)
 const rightImage = ref<File | null>(null)
@@ -12,7 +12,7 @@ const rightPreview = ref<string>('')
 const isLoading = ref(false)
 const error = ref<string>('')
 const predictionResult = ref<string>('')
-const unetOutputs = ref<{left: string, right: string} | null>(null)
+const unetOutputs = ref<{ left: string; right: string } | null>(null)
 const showUnetOutputs = ref(false)
 const viewerContainer = ref<HTMLElement | null>(null)
 const scene = ref<THREE.Scene | null>(null)
@@ -21,104 +21,136 @@ const renderer = ref<THREE.WebGLRenderer | null>(null)
 const controls = ref<OrbitControls | null>(null)
 const pointCloud = ref<THREE.Points | null>(null)
 const animationFrameId = ref<number | null>(null)
+const viewerError = ref(false)
 
-// Initialize 3D viewer
 const initViewer = () => {
-  if (!viewerContainer.value) return
-  
-  // Create scene
+  if (!viewerContainer.value)
+    return
+
   scene.value = new THREE.Scene()
-  scene.value.background = new THREE.Color(0xf0f0f0)
-  
-  // Create camera
+  scene.value.background = new THREE.Color(0xF0F0F0)
+
   camera.value = new THREE.PerspectiveCamera(
     75,
     viewerContainer.value.clientWidth / viewerContainer.value.clientHeight,
     0.1,
-    1000
+    1000,
   )
   camera.value.position.z = 5
-  
-  // Create renderer
+
   renderer.value = new THREE.WebGLRenderer({ antialias: true })
-  renderer.value.setSize(viewerContainer.value.clientWidth, viewerContainer.value.clientHeight)
-  viewerContainer.value.appendChild(renderer.value.domElement)
-  
-  // Add controls
-  controls.value = new OrbitControls(camera.value, renderer.value.domElement)
+  if (renderer.value) {
+    renderer.value.setSize(viewerContainer.value.clientWidth, viewerContainer.value.clientHeight)
+    renderer.value.setPixelRatio(window.devicePixelRatio)
+    viewerContainer.value.appendChild(renderer.value.domElement)
+  }
+
+  controls.value = new OrbitControls(camera.value, renderer.value?.domElement)
   controls.value.enableDamping = true
   controls.value.dampingFactor = 0.05
-  
-  // Add lights
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+
+  const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.5)
+
   scene.value.add(ambientLight)
-  
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
+
+  const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 0.8)
+
   directionalLight.position.set(1, 1, 1)
   scene.value.add(directionalLight)
-  
-  // Start animation loop
+
+  const gridHelper = new THREE.GridHelper(10, 10)
+
+  scene.value.add(gridHelper)
+
+  const axesHelper = new THREE.AxesHelper(5)
+
+  scene.value.add(axesHelper)
+
+  console.log('3D viewer initialized')
+
   animate()
 }
 
-// Animation loop
 const animate = () => {
-  if (!scene.value || !camera.value || !renderer.value || !controls.value) return
-  
-  animationFrameId.value = requestAnimationFrame(animate)
+  if (!renderer.value || !scene.value || !camera.value || !controls.value)
+    return
+
+  requestAnimationFrame(animate)
   controls.value.update()
   renderer.value.render(scene.value, camera.value)
 }
 
-// Load point cloud
 const loadPointCloud = async (url: string) => {
-  if (!scene.value) return
-  
-  // Remove existing point cloud if any
+  console.log('loadPointCloud called with URL:', url)
+  viewerError.value = false
+
+  if (!scene.value || !camera.value || !controls.value) {
+    console.error('Missing required Three.js components:', {
+      scene: !!scene.value,
+      camera: !!camera.value,
+      controls: !!controls.value,
+    })
+    viewerError.value = true
+
+    return
+  }
+
   if (pointCloud.value) {
+    console.log('Removing existing point cloud')
     scene.value.remove(pointCloud.value)
     pointCloud.value = null
   }
-  
+
   try {
     const loader = new PLYLoader()
-    const geometry = await loader.loadAsync(url)
-    
-    // Create material
+
+    const response = await fetch(url)
+    if (!response.ok)
+      throw new Error(`Failed to fetch PLY file: ${response.status} ${response.statusText}`)
+
+    const blob = await response.blob()
+
+    const objectUrl = URL.createObjectURL(blob)
+
+    const geometry = await loader.loadAsync(objectUrl)
+
+    URL.revokeObjectURL(objectUrl)
+
     const material = new THREE.PointsMaterial({
       size: 0.01,
       vertexColors: true,
     })
-    
-    // Create point cloud
+
     pointCloud.value = new THREE.Points(geometry, material)
     scene.value.add(pointCloud.value)
-    
-    // Center camera on point cloud
+
     const box = new THREE.Box3().setFromObject(pointCloud.value)
     const center = box.getCenter(new THREE.Vector3())
     const size = box.getSize(new THREE.Vector3())
-    
+
     const maxDim = Math.max(size.x, size.y, size.z)
     const fov = camera.value.fov * (Math.PI / 180)
-    let cameraZ = Math.abs(maxDim / Math.tan(fov / 2))
-    
+    const cameraZ = Math.abs(maxDim / Math.tan(fov / 2))
+
     camera.value.position.set(center.x, center.y, center.z + cameraZ)
     camera.value.lookAt(center)
     controls.value.target.copy(center)
-  } catch (err) {
+    console.log('Camera positioned')
+  }
+  catch (err) {
     console.error('Error loading point cloud:', err)
     error.value = 'Error loading point cloud visualization'
+    viewerError.value = true
   }
 }
 
-// Handle window resize
 const handleResize = () => {
-  if (!viewerContainer.value || !camera.value || !renderer.value) return
-  
+  if (!viewerContainer.value || !camera.value || !renderer.value)
+    return
+
   const width = viewerContainer.value.clientWidth
   const height = viewerContainer.value.clientHeight
-  
+
   camera.value.aspect = width / height
   camera.value.updateProjectionMatrix()
   renderer.value.setSize(width, height)
@@ -140,9 +172,23 @@ const handleRightImageChange = (event: Event) => {
   }
 }
 
+const checkFileAccessibility = async (url: string): Promise<boolean> => {
+  try {
+    const response = await axios.head(url)
+
+    return response.status === 200
+  }
+  catch (err) {
+    console.error(`Error checking file accessibility for ${url}:`, err)
+
+    return false
+  }
+}
+
 const handleSubmit = async () => {
   if (!leftImage.value || !rightImage.value) {
     error.value = 'Please select both left and right images'
+
     return
   }
 
@@ -153,6 +199,7 @@ const handleSubmit = async () => {
   showUnetOutputs.value = false
 
   const formData = new FormData()
+
   formData.append('left_image', leftImage.value)
   formData.append('right_image', rightImage.value)
   formData.append('return_unet_outputs', 'true')
@@ -163,46 +210,115 @@ const handleSubmit = async () => {
         'Content-Type': 'multipart/form-data',
       },
     })
-    
-    predictionResult.value = response.data.point_cloud_path
-    
-    // Check if UNet outputs are available
-    if (response.data.unet_outputs) {
-      unetOutputs.value = response.data.unet_outputs
+
+    let pointCloudUrl = response.data.point_cloud_path
+
+    if (pointCloudUrl.match(/^[A-Z]:\\|^\/|^\\/i)) {
+      const mediaIndex = pointCloudUrl.indexOf('media/')
+      if (mediaIndex !== -1) {
+        pointCloudUrl = pointCloudUrl.substring(mediaIndex)
+      }
+      else {
+        console.error('Could not find media/ in path:', pointCloudUrl)
+        error.value = 'Invalid file path returned by server'
+
+        return
+      }
     }
-    
-    // Load point cloud in 3D viewer
-    await loadPointCloud(response.data.point_cloud_path)
-  } catch (err) {
+
+    pointCloudUrl = `http://localhost:8000/${pointCloudUrl}`
+    console.log('Constructed point cloud URL:', pointCloudUrl)
+
+    const isPointCloudAccessible = await checkFileAccessibility(pointCloudUrl)
+
+    if (!isPointCloudAccessible) {
+      const predictedUrl = pointCloudUrl.endsWith('_predicted.ply')
+        ? pointCloudUrl
+        : `${pointCloudUrl}_predicted.ply`
+
+      const isPredictedAccessible = await checkFileAccessibility(predictedUrl)
+
+      if (isPredictedAccessible) {
+        predictionResult.value = predictedUrl
+      }
+      else {
+        error.value = 'Point cloud file is not accessible. Please check server configuration.'
+
+        return
+      }
+    }
+    else {
+      predictionResult.value = pointCloudUrl
+    }
+
+    if (response.data.unet_outputs) {
+      let leftUnetUrl = response.data.unet_outputs.left
+      if (leftUnetUrl.match(/^[A-Z]:\\|^\/|^\\/i)) {
+        const mediaIndex = leftUnetUrl.indexOf('media/')
+        if (mediaIndex !== -1)
+          leftUnetUrl = leftUnetUrl.substring(mediaIndex)
+      }
+      leftUnetUrl = `http://localhost:8000/${leftUnetUrl}`
+
+      let rightUnetUrl = response.data.unet_outputs.right
+      if (rightUnetUrl.match(/^[A-Z]:\\|^\/|^\\/i)) {
+        const mediaIndex = rightUnetUrl.indexOf('media/')
+        if (mediaIndex !== -1)
+          rightUnetUrl = rightUnetUrl.substring(mediaIndex)
+      }
+      rightUnetUrl = `http://localhost:8000/${rightUnetUrl}`
+
+      const isLeftUnetAccessible = await checkFileAccessibility(leftUnetUrl)
+      const isRightUnetAccessible = await checkFileAccessibility(rightUnetUrl)
+
+      if (!isLeftUnetAccessible || !isRightUnetAccessible)
+        console.warn('One or more UNet output files are not accessible')
+
+      unetOutputs.value = {
+        left: leftUnetUrl,
+        right: rightUnetUrl,
+      }
+    }
+    else {
+      console.log('No UNet outputs in response')
+    }
+
+    await loadPointCloud(predictionResult.value)
+  }
+  catch (err) {
     error.value = 'Error processing images. Please try again.'
     console.error('Prediction error:', err)
-  } finally {
+  }
+  finally {
     isLoading.value = false
   }
 }
 
 const downloadPointCloud = async () => {
-  if (!predictionResult.value) return
-  
+  if (!predictionResult.value)
+    return
+
   try {
     const response = await axios.get(predictionResult.value, {
-      responseType: 'blob'
+      responseType: 'blob',
     })
-    
+
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
+
     link.href = url
     link.setAttribute('download', 'point_cloud.ply')
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-  } catch (err) {
+    URL.revokeObjectURL(url)
+  }
+  catch (err) {
     console.error('Error downloading point cloud:', err)
     error.value = 'Error downloading point cloud'
   }
 }
 
-// Lifecycle hooks
 onMounted(() => {
   initViewer()
   window.addEventListener('resize', handleResize)
@@ -210,23 +326,26 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
-  if (animationFrameId.value) {
+  if (animationFrameId.value)
     cancelAnimationFrame(animationFrameId.value)
-  }
-  
-  // Clean up Three.js resources
+
   if (pointCloud.value) {
-    pointCloud.value.geometry.dispose()
-    pointCloud.value.material.dispose()
+    if (pointCloud.value.geometry)
+      pointCloud.value.geometry.dispose()
+
+    if (pointCloud.value.material) {
+      if (Array.isArray(pointCloud.value.material))
+        pointCloud.value.material.forEach(material => material.dispose())
+      else
+        pointCloud.value.material.dispose()
+    }
   }
-  
-  if (renderer.value) {
+
+  if (renderer.value)
     renderer.value.dispose()
-  }
-  
-  if (controls.value) {
+
+  if (controls.value)
     controls.value.dispose()
-  }
 })
 </script>
 
@@ -238,7 +357,10 @@ onBeforeUnmount(() => {
 
     <VRow>
       <!-- Left Image Selection -->
-      <VCol cols="12" md="6">
+      <VCol
+        cols="12"
+        md="6"
+      >
         <VCard>
           <VCardTitle>Left Image</VCardTitle>
           <VCardText>
@@ -261,7 +383,10 @@ onBeforeUnmount(() => {
       </VCol>
 
       <!-- Right Image Selection -->
-      <VCol cols="12" md="6">
+      <VCol
+        cols="12"
+        md="6"
+      >
         <VCard>
           <VCardTitle>Right Image</VCardTitle>
           <VCardText>
@@ -284,7 +409,10 @@ onBeforeUnmount(() => {
       </VCol>
 
       <!-- Submit Button -->
-      <VCol cols="12" class="text-center">
+      <VCol
+        cols="12"
+        class="text-center"
+      >
         <VBtn
           color="primary"
           size="large"
@@ -297,7 +425,10 @@ onBeforeUnmount(() => {
       </VCol>
 
       <!-- Error Message -->
-      <VCol v-if="error" cols="12">
+      <VCol
+        v-if="error"
+        cols="12"
+      >
         <VAlert
           type="error"
           class="mb-4"
@@ -307,7 +438,11 @@ onBeforeUnmount(() => {
       </VCol>
 
       <!-- UNet Outputs Toggle -->
-      <VCol v-if="unetOutputs" cols="12" class="text-center">
+      <VCol
+        v-if="unetOutputs"
+        cols="12"
+        class="text-center"
+      >
         <VBtn
           color="secondary"
           :text="showUnetOutputs ? 'Hide UNet Outputs' : 'Show UNet Outputs'"
@@ -316,12 +451,18 @@ onBeforeUnmount(() => {
       </VCol>
 
       <!-- UNet Outputs -->
-      <VCol v-if="unetOutputs && showUnetOutputs" cols="12">
+      <VCol
+        v-if="unetOutputs && showUnetOutputs"
+        cols="12"
+      >
         <VCard>
           <VCardTitle>UNet Outputs</VCardTitle>
           <VCardText>
             <VRow>
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VCard>
                   <VCardTitle>Left Image UNet Output</VCardTitle>
                   <VCardText>
@@ -333,7 +474,10 @@ onBeforeUnmount(() => {
                   </VCardText>
                 </VCard>
               </VCol>
-              <VCol cols="12" md="6">
+              <VCol
+                cols="12"
+                md="6"
+              >
                 <VCard>
                   <VCardTitle>Right Image UNet Output</VCardTitle>
                   <VCardText>
@@ -351,23 +495,35 @@ onBeforeUnmount(() => {
       </VCol>
 
       <!-- 3D Point Cloud Viewer -->
-      <VCol v-if="predictionResult" cols="12">
+      <VCol
+        v-if="predictionResult"
+        cols="12"
+      >
         <VCard>
-          <VCardTitle class="d-flex justify-space-between align-center">
-            <span>Generated Point Cloud</span>
-            <VBtn
-              color="primary"
-              prepend-icon="ri-download-line"
-              @click="downloadPointCloud"
-            >
-              Download PLY
-            </VBtn>
-          </VCardTitle>
           <VCardText>
-            <div 
-              ref="viewerContainer" 
+            <div
+              v-if="!viewerError"
+              ref="viewerContainer"
               class="point-cloud-viewer"
-            ></div>
+            />
+            <div
+              v-else
+              class="text-center pa-4"
+            >
+              <VAlert
+                type="warning"
+                class="mb-4"
+              >
+                Unable to display the point cloud in 3D viewer. You can still download the file.
+              </VAlert>
+              <VBtn
+                color="primary"
+                prepend-icon="ri-download-line"
+                @click="downloadPointCloud"
+              >
+                Download Point Cloud (PLY)
+              </VBtn>
+            </div>
           </VCardText>
         </VCard>
       </VCol>

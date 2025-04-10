@@ -9,14 +9,14 @@ import VerticalNavLink from '@layouts/components/VerticalNavLink.vue'
   <VerticalNavGroup
     :item="{
       title: 'Dashboards',
-      badgeContent: '5',
-      badgeClass: 'bg-error',
+      //badgeContent: '5',
+      //badgeClass: 'bg-error',
       icon: 'ri-home-smile-line',
     }"
   >
     <VerticalNavLink
       :item="{
-        title: 'Analytics',
+        title: 'Generate 3D',
         to: '/dashboard',
       }"
     />

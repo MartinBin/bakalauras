@@ -28,13 +28,11 @@ const isPasswordVisible = ref(false)
 const authStore = useAuthStore()
 const router = useRouter()
 
-const email = ref('')
-const password = ref('')
 const errorMessage = ref('')
 
 const handleLogin = async () => {
   try {
-    await authStore.login(email.value, password.value)
+    await authStore.login(form.value.email, form.value.password)
     router.push('/')
   }
   catch (error) {

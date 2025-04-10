@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 
-const API_URL = 'http://localhost:8080/api/auth/'
+const API_URL = 'http://localhost:8000/api/auth'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -13,7 +13,7 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(email: string, password: string) {
       try {
-        const response = await axios.post(`${API_URL}/login`, { email, password })
+        const response = await axios.post(`${API_URL}/login/`, { email, password })
 
         this.accessToken = response.data.accessToken
         this.refreshToken = response.data.refreshToken
@@ -32,7 +32,7 @@ export const useAuthStore = defineStore('auth', {
 
     async fetchUser() {
       try {
-        const response = await axios.get(`${API_URL}/user`)
+        const response = await axios.get(`${API_URL}/user/`)
 
         this.user = response.data
       }
@@ -48,7 +48,9 @@ export const useAuthStore = defineStore('auth', {
         })
 
         this.accessToken = response.data.access
-        localStorage.setItem('access_token', this.accessToken)
+        if (this.accessToken)
+          localStorage.setItem('access_token', this.accessToken)
+
         axios.defaults.headers.common['Authorization'] = `Bearer ${this.accessToken}`
       }
       catch (error) {
