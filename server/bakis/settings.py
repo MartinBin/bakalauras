@@ -84,7 +84,7 @@ TEMPLATES = [
     },
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8080",
@@ -221,7 +221,7 @@ SESSION_ENGINE = 'django_mongoengine.sessions'
 SESSION_SERIALIZER = 'django_mongoengine.sessions.BSONSerializer'
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Connect to MongoDB
@@ -229,12 +229,11 @@ mongoengine.connect(
     db='bakalauras',
     host='localhost',
     port=27017,
-    username='',  # Add if authentication is required
-    password='',  # Add if authentication is required
-    authentication_source='admin'  # Add if authentication is required
+    username='',
+    password='', 
+    authentication_source='admin'
 )
 
-# Logging Configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

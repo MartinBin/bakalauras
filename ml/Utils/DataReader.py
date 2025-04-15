@@ -36,11 +36,9 @@ class DataReading(Dataset):
         self.skip_indices = set()
         self.successful_samples = 0
         
-        # Setup logging
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO if verbose > 0 else logging.WARNING)
         
-        # Load all CSV files from the dataset structure
         self.data = self._load_all_csv_files()
         
         if len(self.data) == 0:
@@ -52,7 +50,6 @@ class DataReading(Dataset):
         """Load and combine all CSV files from the dataset structure"""
         all_data = []
         
-        # Walk through the directory structure
         for dataset_dir in os.listdir(self.base_directory):
             dataset_path = os.path.join(self.base_directory, dataset_dir)
             if not os.path.isdir(dataset_path):
@@ -67,7 +64,6 @@ class DataReading(Dataset):
                 if os.path.exists(csv_path):
                     try:
                         df = pd.read_csv(csv_path)
-                        # Add dataset and keyframe information
                         df['dataset'] = dataset_dir
                         df['keyframe'] = keyframe_dir
                         all_data.append(df)
@@ -125,7 +121,6 @@ class DataReading(Dataset):
             self.__verbose(f"Tensor shape: {vertices.shape}", level=2)
             self.__verbose(f"Tensor range: [{vertices.min().item():.4f}, {vertices.max().item():.4f}]", level=2)
             
-            # Store original coordinates for debugging
             original_min = vertices.min(dim=0)[0]
             original_max = vertices.max(dim=0)[0]
             original_center = (original_min + original_max) / 2
@@ -208,7 +203,6 @@ class DataReading(Dataset):
             dataset = row['dataset']
             keyframe = row['keyframe']
             
-            # Construct paths relative to the base directory
             base_path = os.path.join(self.base_directory, dataset, keyframe)
             img1_path = os.path.join(base_path, row['Left_RGB'])
             img2_path = os.path.join(base_path, row['Right_RGB'])
@@ -265,7 +259,7 @@ class DataReading(Dataset):
         """Load and normalize TIFF image"""
         tiff_data = tifffile.imread(path)
         
-        if tiff_data.ndim == 2:  # Single channel depth map
+        if tiff_data.ndim == 2:
             if tiff_data.dtype == np.float32 or tiff_data.dtype == np.float64:
                 depth_min = np.min(tiff_data)
                 depth_max = np.max(tiff_data)
@@ -275,7 +269,7 @@ class DataReading(Dataset):
                     norm_data = np.zeros_like(tiff_data)
                 tiff_data = norm_data.astype(np.uint8)
                 tiff_data = np.stack((tiff_data,) * 3, axis=-1)
-        elif tiff_data.ndim == 3 and tiff_data.shape[2] == 3:  # RGB format
+        elif tiff_data.ndim == 3 and tiff_data.shape[2] == 3:
             if tiff_data.dtype != np.uint8:
                 tiff_data = (tiff_data / tiff_data.max() * 255).astype(np.uint8)
         

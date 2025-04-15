@@ -12,7 +12,15 @@ from datetime import datetime, timedelta
 import torch.nn.functional as F
 
 def format_time(seconds):
-    """Format time duration in a human-readable way"""
+    """
+    Format time duration in a human-readable way.
+    
+    Args:
+        seconds: Time duration in seconds
+        
+    Returns:
+        str: Formatted time string (e.g., "2h 30m 15s" or "45m 30s" or "30s")
+    """
     duration = timedelta(seconds=seconds)
     hours = duration.seconds // 3600
     minutes = (duration.seconds % 3600) // 60
@@ -26,11 +34,43 @@ def format_time(seconds):
         return f"{seconds}s"
 
 class Trainer:
-    def __init__(self, dataloader=None, num_epochs=10, latent_dim=32, checkpoint_location="./Checkpoints",model_location="./Trained_Models",verbose=0):
+    """
+    A class to handle the training, validation, and prediction of a 3D reconstruction model.
+    
+    This class manages the training process for a model that reconstructs 3D point clouds
+    from stereo images. It includes functionality for training, validation, early stopping,
+    checkpointing, and prediction.
+    
+    The model architecture consists of:
+    - UNet: Processes left and right images
+    - Encoders: Encode the processed images and UNet outputs
+    - Decoder: Reconstructs the 3D point cloud from encoded features
+    """
+    
+    def __init__(self, dataloader=None, val_dataloader=None, num_epochs=10, latent_dim=32, 
+                 checkpoint_location="./Checkpoints", model_location="./Trained_Models", 
+                 verbose=0, early_stopping_patience=5, early_stopping_min_delta=0.001,
+                 learning_rate=0.0001):
+        """
+        Initialize the Trainer with model components and training parameters.
+        
+        Args:
+            dataloader (DataLoader, optional): DataLoader for training data
+            val_dataloader (DataLoader, optional): DataLoader for validation data
+            num_epochs (int, optional): Number of training epochs. Defaults to 10.
+            latent_dim (int, optional): Dimension of latent space. Defaults to 32.
+            checkpoint_location (str, optional): Directory to save checkpoints. Defaults to "./Checkpoints".
+            model_location (str, optional): Directory to save final models. Defaults to "./Trained_Models".
+            verbose (int, optional): Verbosity level (0=minimal, 1=normal, 2=detailed). Defaults to 0.
+            early_stopping_patience (int, optional): Number of epochs to wait before early stopping. Defaults to 5.
+            early_stopping_min_delta (float, optional): Minimum change in validation loss to qualify as an improvement. Defaults to 0.001.
+            learning_rate (float, optional): Learning rate for the optimizer. Defaults to 0.0001.
+        """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {self.device}")
         torch.cuda.empty_cache()
         self.dataloader = dataloader
+        self.val_dataloader = val_dataloader
         self.num_epochs = num_epochs
         self.left_encoder = Encoder(latent_dim).to(self.device)
         self.right_encoder = Encoder(latent_dim).to(self.device)
@@ -40,13 +80,40 @@ class Trainer:
         self.model_location = model_location
         os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
         self.verbose = verbose
+        self.early_stopping_patience = early_stopping_patience
+        self.early_stopping_min_delta = early_stopping_min_delta
+        self.best_val_loss = float('inf')
+        self.patience_counter = 0
+        self.best_model_state = None
+        self.learning_rate = learning_rate
 
     def __verbose(self, message, level=1):
-        """Print message only if verbose level is sufficient"""
+        """
+        Print message only if verbose level is sufficient.
+        
+        Args:
+            message (str): Message to print
+            level (int, optional): Minimum verbose level required to print. Defaults to 1.
+        """
         if self.verbose >= level:
             print(message)
 
     def train(self):
+        """
+        Train the model using the provided dataloader.
+        
+        This method implements the training loop with the following features:
+        - Gradient checkpointing for memory efficiency
+        - Early stopping based on validation loss
+        - Checkpointing of the best model
+        - Detailed progress reporting based on verbose level
+        
+        The training process:
+        1. Processes stereo images through UNet
+        2. Encodes the processed images and UNet outputs
+        3. Decodes the fused latent representation to generate a 3D point cloud
+        4. Computes losses and updates model parameters
+        """
         criterion_unet = torch.nn.MSELoss(reduction='mean')
         criterion_point = self.memory_efficient_point_loss
         
@@ -54,17 +121,29 @@ class Trainer:
             list(self.unet.parameters()) +
             list(self.left_encoder.parameters()) +
             list(self.right_encoder.parameters()) +
-            list(self.decoder.parameters()), lr=0.0001)
+            list(self.decoder.parameters()), lr=self.learning_rate)
 
         max_grad_norm = 1.0
 
         self.__verbose("Training...", level=1)
         start_time = time.time()
+        
+        # Initialize early stopping variables
+        self.best_val_loss = float('inf')
+        self.patience_counter = 0
+        self.best_model_state = None
+        
         for epoch in range(self.num_epochs):
             start = time.time()
             running_loss = 0.0
             running_unet_loss = 0.0
             running_point_loss = 0.0
+            
+            self.left_encoder.train()
+            self.right_encoder.train()
+            self.decoder.train()
+            self.unet.train()
+            
             for i, data in enumerate(self.dataloader, 0):
                 batch_start = time.time()
                 left_images, left_depths, right_images, right_depths, target_point_cloud = data
@@ -84,10 +163,6 @@ class Trainer:
                 target_point_cloud = target_point_cloud.to(self.device).float()
 
                 optimizer.zero_grad()
-                self.left_encoder.train()
-                self.right_encoder.train()
-                self.decoder.train()
-                self.unet.train()
 
                 with torch.amp.autocast(device_type=self.device.type):
                     left = self.unet(left_images)
@@ -129,14 +204,11 @@ class Trainer:
                         self.__verbose(f"Predicted: {predicted_point_cloud.shape}, Target: {target_point_cloud.shape}", level=2)
                         continue
 
-                    # Calculate UNet loss (for depth maps)
                     unet_loss_left = criterion_unet(left, left_depths)
                     unet_loss_right = criterion_unet(right, right_depths)
                     unet_loss = unet_loss_left + unet_loss_right
                     
-                    # Calculate point cloud loss using memory-efficient approach
                     try:
-                        # Use memory-efficient point loss
                         point_loss = criterion_point(predicted_point_cloud, target_point_cloud, num_samples=1000)
                         
                     except Exception as e:
@@ -157,8 +229,6 @@ class Trainer:
                         self.__verbose(f"Point Loss NaN: {torch.isnan(point_loss)}", level=2)
                         continue
 
-                    # Combine UNet and point cloud losses
-                    # You can adjust the weights to prioritize one over the other
                     total_loss = unet_loss + point_loss
 
                 if torch.isnan(total_loss):
@@ -199,10 +269,55 @@ class Trainer:
             self.__verbose(f"Average Point Cloud Loss: {avg_point_loss:.6f}", level=1)
             self.__verbose(f"Average Total Loss: {avg_loss:.6f}", level=1)
             self.__verbose(f"Time: {format_time(end - start)}\n", level=1)
+            
+            if self.val_dataloader is not None:
+                val_loss = self._validate()
+                self.__verbose(f"Validation Loss: {val_loss:.6f}", level=1)
+                
+                if val_loss < self.best_val_loss - self.early_stopping_min_delta:
+                    self.best_val_loss = val_loss
+                    self.patience_counter = 0
+                    
+                    self.best_model_state = {
+                        'unet': self.unet.state_dict(),
+                        'left_encoder': self.left_encoder.state_dict(),
+                        'right_encoder': self.right_encoder.state_dict(),
+                        'decoder': self.decoder.state_dict()
+                    }
+                    
+                    if not os.path.exists(self.checkpoint_location):
+                        os.makedirs(self.checkpoint_location)
+                    
+                    torch.save(self.best_model_state, f"{self.checkpoint_location}/best_model.pth")
+                    self.__verbose(f"New best model saved with validation loss: {val_loss:.6f}", level=1)
+                else:
+                    self.patience_counter += 1
+                    self.__verbose(f"No improvement for {self.patience_counter} epochs", level=1)
+                    
+                    if self.patience_counter >= self.early_stopping_patience:
+                        self.__verbose(f"Early stopping triggered after {epoch + 1} epochs", level=1)
+                        break
+            else:
+                if not os.path.exists(self.checkpoint_location):
+                    os.makedirs(self.checkpoint_location)
+                
+                torch.save({
+                    'unet': self.unet.state_dict(),
+                    'left_encoder': self.left_encoder.state_dict(),
+                    'right_encoder': self.right_encoder.state_dict(),
+                    'decoder': self.decoder.state_dict()
+                }, f"{self.checkpoint_location}/epoch_{epoch+1}.pth")
 
         end_time = time.time()
         self.__verbose(f"Training taken: {format_time(end_time - start_time)}", level=1)
 
+        if self.best_model_state is not None:
+            self.__verbose("Loading best model from validation", level=1)
+            self.unet.load_state_dict(self.best_model_state['unet'])
+            self.left_encoder.load_state_dict(self.best_model_state['left_encoder'])
+            self.right_encoder.load_state_dict(self.best_model_state['right_encoder'])
+            self.decoder.load_state_dict(self.best_model_state['decoder'])
+        
         if not os.path.exists(self.model_location):
             os.makedirs(self.model_location)
 
@@ -211,8 +326,73 @@ class Trainer:
         torch.save(self.right_encoder.state_dict(), f"{self.model_location}/right_encoder.pth")
         torch.save(self.decoder.state_dict(), f"{self.model_location}/decoder.pth")
         self.__verbose("Models saved successfully", level=1)
+        
+    def _validate(self):
+        """
+        Run validation on the validation dataset.
+        
+        This method evaluates the model on the validation dataset and returns the validation loss.
+        It uses the same loss functions as the training process but without gradient computation.
+        
+        Returns:
+            float: Average validation loss across all batches
+        """
+        self.left_encoder.eval()
+        self.right_encoder.eval()
+        self.decoder.eval()
+        self.unet.eval()
+        
+        criterion_unet = torch.nn.MSELoss(reduction='mean')
+        criterion_point = self.memory_efficient_point_loss
+        
+        val_loss = 0.0
+        
+        with torch.no_grad():
+            for data in self.val_dataloader:
+                left_images, left_depths, right_images, right_depths, target_point_cloud = data
+                
+                left_images = left_images.to(self.device).float() / 255.0
+                right_images = right_images.to(self.device).float() / 255.0
+                
+                left_depths = left_depths.to(self.device).float()
+                right_depths = right_depths.to(self.device).float()
+                left_depths = (left_depths - left_depths.min()) / (left_depths.max() - left_depths.min() + 1e-8)
+                right_depths = (right_depths - right_depths.min()) / (right_depths.max() - right_depths.min() + 1e-8)
+                
+                target_point_cloud = target_point_cloud.to(self.device).float()
+                
+                with torch.amp.autocast(device_type=self.device.type):
+                    left = self.unet(left_images)
+                    right = self.unet(right_images)
+                    
+                    left_latent = self.left_encoder(torch.cat((left_images,left),dim=1))
+                    right_latent = self.right_encoder(torch.cat((right_images,right),dim=1))
+                    
+                    fused_latent = torch.cat((left_latent, right_latent), dim=1)
+                    predicted_point_cloud = self.decoder(fused_latent)
+                    
+                    unet_loss_left = criterion_unet(left, left_depths)
+                    unet_loss_right = criterion_unet(right, right_depths)
+                    unet_loss = unet_loss_left + unet_loss_right
+                    
+                    try:
+                        point_loss = criterion_point(predicted_point_cloud, target_point_cloud, num_samples=1000)
+                    except Exception as e:
+                        self.__verbose(f"Error calculating validation point cloud loss: {str(e)}", level=2)
+                        continue
+                    
+                    total_loss = unet_loss + point_loss
+                    val_loss += total_loss.item()
+        
+        return val_loss / len(self.val_dataloader)
 
     def load_model(self):
+        """
+        Load the trained model weights from the model location.
+        
+        This method loads the saved weights for all model components (UNet, encoders, and decoder)
+        from the specified model location directory.
+        """
         self.unet.load_state_dict(torch.load(self.model_location+"/unet.pth"))
         self.left_encoder.load_state_dict(torch.load(self.model_location + "/left_encoder.pth"))
         self.right_encoder.load_state_dict(torch.load(self.model_location + "/right_encoder.pth"))
@@ -223,13 +403,18 @@ class Trainer:
         Memory-efficient point cloud loss using a combination of sampling strategies.
         Designed to work with limited GPU memory (12GB) while still providing meaningful metrics.
         
+        This loss function combines several metrics:
+        - Chamfer distance (bidirectional point-to-point distance)
+        - Histogram-based distribution comparison
+        - Volume and center comparison
+        
         Args:
-            pred: predicted point cloud (B, N, 3) or (N, 3)
-            target: target point cloud (B, M, 3) or (M, 3)
-            num_samples: number of points to sample from each cloud
+            pred (torch.Tensor): predicted point cloud (B, N, 3) or (N, 3)
+            target (torch.Tensor): target point cloud (B, M, 3) or (M, 3)
+            num_samples (int, optional): number of points to sample from each cloud. Defaults to 1000.
             
         Returns:
-            Loss value that better reflects point cloud quality while being memory-efficient
+            torch.Tensor: Loss value that better reflects point cloud quality while being memory-efficient
         """
         if len(pred.shape) == 2:
             pred = pred.unsqueeze(0)
@@ -347,6 +532,23 @@ class Trainer:
         return scaled_loss
 
     def predict(self, left_image, right_image, target_point_cloud=None, save_path="./predictions"):
+        """
+        Generate a 3D point cloud prediction from stereo images.
+        
+        This method takes left and right stereo images, processes them through the model,
+        and generates a 3D point cloud prediction. Optionally, it can compare the prediction
+        with a target point cloud and save both to files.
+        
+        Args:
+            left_image (torch.Tensor): Left stereo image
+            right_image (torch.Tensor): Right stereo image
+            target_point_cloud (torch.Tensor, optional): Target point cloud for comparison. Defaults to None.
+            save_path (str, optional): Path to save prediction results. Defaults to "./predictions".
+            
+        Returns:
+            tuple: (predicted_point_cloud, metrics) where metrics is a dictionary of evaluation metrics
+                  or None if target_point_cloud is not provided
+        """
         self.unet.eval()
         self.left_encoder.eval()
         self.right_encoder.eval()
@@ -444,7 +646,17 @@ class Trainer:
                 return predicted_point_cloud, None
 
     def save_point_cloud_as_ply(self, point_cloud, output_filename):
-        """Save point cloud to PLY file with proper coordinates"""
+        """
+        Save a point cloud to a PLY file with proper coordinates.
+        
+        This method converts a point cloud tensor to a PLY file format that can be
+        opened in 3D visualization software. It handles normalization and denormalization
+        of the point cloud coordinates.
+        
+        Args:
+            point_cloud (torch.Tensor): Point cloud to save
+            output_filename (str): Path to save the PLY file
+        """
         try:
             point_cloud = point_cloud.reshape(-1, 3)
             
@@ -492,6 +704,20 @@ class Trainer:
             raise
 
     def getUnetOutput(self,left,right):
+        """
+        Get the UNet output for left and right images.
+        
+        This method processes left and right images through the UNet model and returns
+        the processed outputs. It's useful for visualizing the intermediate results
+        of the UNet processing.
+        
+        Args:
+            left (torch.Tensor): Left image
+            right (torch.Tensor): Right image
+            
+        Returns:
+            tuple: (left_unet_output, right_unet_output)
+        """
         with torch.amp.autocast(device_type=self.device.type):
             left_images = left.to(self.device).float() / 255.0
             right_images = right.to(self.device).float() / 255.0
