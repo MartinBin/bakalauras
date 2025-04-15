@@ -53,4 +53,4 @@ class User(Document):
     
     @property
     def pk(self):
-        return self.id
+        return self._id

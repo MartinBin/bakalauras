@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
 import axios from 'axios'
-import AuthProvider from '@/views/pages/authentication/AuthProvider.vue'
 
 import logo from '@images/logo.svg?raw'
 import authV1MaskDark from '@images/pages/auth-v1-mask-dark.png'
@@ -23,6 +22,8 @@ const authThemeMask = computed(() => {
     ? authV1MaskLight
     : authV1MaskDark
 })
+
+const errorMessage = ref('')
 
 const isPasswordVisible = ref(false)
 
@@ -108,24 +109,8 @@ const register = async () => {
                 :append-inner-icon="isPasswordVisible ? 'ri-eye-off-line' : 'ri-eye-line'"
                 @click:append-inner="isPasswordVisible = !isPasswordVisible"
               />
-              <div class="d-flex align-center my-6">
-                <VCheckbox
-                  id="privacy-policy"
-                  v-model="form.privacyPolicies"
-                  inline
-                />
-                <VLabel
-                  for="privacy-policy"
-                  style="opacity: 1;"
-                >
-                  <span class="me-1">I agree to</span>
-                  <a
-                    href="javascript:void(0)"
-                    class="text-primary"
-                  >privacy policy & terms</a>
-                </VLabel>
-              </div>
-
+            </VCol>
+            <VCol cols ="12">
               <VBtn
                 block
                 type="submit"
@@ -146,23 +131,6 @@ const register = async () => {
               >
                 Sign in instead
               </RouterLink>
-            </VCol>
-
-            <VCol
-              cols="12"
-              class="d-flex align-center"
-            >
-              <VDivider />
-              <span class="mx-4">or</span>
-              <VDivider />
-            </VCol>
-
-            <!-- auth providers -->
-            <VCol
-              cols="12"
-              class="text-center"
-            >
-              <AuthProvider />
             </VCol>
           </VRow>
         </VForm>

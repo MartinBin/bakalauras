@@ -4,7 +4,11 @@ import axios from 'axios'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
+import { usePredictionStore } from '@/stores/predictionStore.ts'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
+const predictionStore = usePredictionStore()
 const leftImage = ref<File | null>(null)
 const rightImage = ref<File | null>(null)
 const leftPreview = ref<string>('')
@@ -347,12 +351,24 @@ onBeforeUnmount(() => {
   if (controls.value)
     controls.value.dispose()
 })
+
+const viewHistory = () => {
+  router.push('/prediction-history')
+}
 </script>
 
 <template>
   <VCard class="pa-4">
-    <VCardTitle class="text-h5 mb-4">
-      Point Cloud Prediction
+    <VCardTitle class="d-flex justify-space-between align-center pa-4">
+      <span>3D Point Cloud Generation</span>
+      <VBtn
+        color="primary"
+        variant="outlined"
+        size="small"
+        @click="viewHistory"
+      >
+        View History
+      </VBtn>
     </VCardTitle>
 
     <VRow>
@@ -549,3 +565,4 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 </style>
+

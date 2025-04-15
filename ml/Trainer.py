@@ -393,10 +393,13 @@ class Trainer:
         This method loads the saved weights for all model components (UNet, encoders, and decoder)
         from the specified model location directory.
         """
-        self.unet.load_state_dict(torch.load(self.model_location+"/unet.pth"))
-        self.left_encoder.load_state_dict(torch.load(self.model_location + "/left_encoder.pth"))
-        self.right_encoder.load_state_dict(torch.load(self.model_location + "/right_encoder.pth"))
-        self.decoder.load_state_dict(torch.load(self.model_location + "/decoder.pth"))
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Loading models to device: {device}")
+        
+        self.unet.load_state_dict(torch.load(self.model_location+"/unet.pth", map_location=device))
+        self.left_encoder.load_state_dict(torch.load(self.model_location + "/left_encoder.pth", map_location=device))
+        self.right_encoder.load_state_dict(torch.load(self.model_location + "/right_encoder.pth", map_location=device))
+        self.decoder.load_state_dict(torch.load(self.model_location + "/decoder.pth", map_location=device))
         
     def memory_efficient_point_loss(self, pred, target, num_samples=1000):
         """

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import User, PredictionResult
 
 class UserSerializer(serializers.Serializer):
-    id = serializers.CharField(source='pk')
+    id = serializers.CharField()
     email = serializers.EmailField()
     username = serializers.CharField()
     is_active = serializers.BooleanField()
@@ -20,6 +20,7 @@ class UserRegistrationSerializer(serializers.Serializer):
             username=validated_data['username']
         )
         user.set_password(validated_data['password'])
+        user.save()
         return user
 
 class UserLoginSerializer(serializers.Serializer):
