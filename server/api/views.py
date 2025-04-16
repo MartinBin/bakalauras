@@ -270,7 +270,7 @@ def run_prediction(left_image, right_image):
         model_location = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../ml/Trained_Models"))
         logger.info(f"Loading models from {model_location}")
         
-        trainer = Trainer(model_location=model_location)
+        trainer = Trainer(model_location=model_location,verbose=1)
         
         trainer.load_model()
         

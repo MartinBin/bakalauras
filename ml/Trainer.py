@@ -584,6 +584,8 @@ class Trainer:
                 return None, None
 
             fused_latent = torch.cat((left_latent, right_latent), dim=1)
+
+            self.__verbose("Starting decoder",level=1)
             predicted_point_cloud = self.decoder(fused_latent)
 
             if torch.isnan(predicted_point_cloud).any():
