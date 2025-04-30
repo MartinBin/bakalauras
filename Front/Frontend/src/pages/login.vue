@@ -50,27 +50,17 @@ const handleLogin = async () => {
       max-width="448"
     >
       <VCardItem class="justify-center">
-        <RouterLink
-          to="/"
-          class="d-flex align-center gap-3"
-        >
-          <!-- eslint-disable vue/no-v-html -->
-          <div
-            class="d-flex"
-            v-html="logo"
-          />
           <h2 class="font-weight-medium text-2xl text-uppercase">
-            Materio
+            Wound3D
           </h2>
-        </RouterLink>
       </VCardItem>
 
       <VCardText class="pt-2">
         <h4 class="text-h4 mb-1">
-          Welcome to Materio! 👋🏻
+          Welcome to Wound3D! 👋🏻
         </h4>
         <p class="mb-0">
-          Please sign-in to your account and start the adventure
+          Please sign-in to your account
         </p>
       </VCardText>
 
@@ -140,23 +130,6 @@ const handleLogin = async () => {
               >
                 Create an account
               </RouterLink>
-            </VCol>
-
-            <VCol
-              cols="12"
-              class="d-flex align-center"
-            >
-              <VDivider />
-              <span class="mx-4">or</span>
-              <VDivider />
-            </VCol>
-
-            <!-- auth providers -->
-            <VCol
-              cols="12"
-              class="text-center"
-            >
-              <AuthProvider />
             </VCol>
           </VRow>
         </VForm>

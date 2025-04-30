@@ -715,7 +715,7 @@ class Trainer:
             self.__verbose(f"Point cloud range: [{points_np.min()}, {points_np.max()}]", level=2)
             self.__verbose(f"Point cloud mean: {points_np.mean(axis=0)}", level=2)
             
-            o3d.io.write_point_cloud(output_filename, pcd)
+            o3d.io.write_point_cloud(output_filename, pcd, write_ascii=True)
             self.__verbose(f"Saved point cloud to {output_filename}", level=1)
             
         except Exception as e:

@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'dj_rest_auth.registration',
-    'django_mongoengine',
     'api',
 ]
 
@@ -216,9 +215,6 @@ MONGODB_DATABASES = {
     }
 }
 
-# Use MongoEngine sessions
-SESSION_ENGINE = 'django_mongoengine.sessions'
-SESSION_SERIALIZER = 'django_mongoengine.sessions.BSONSerializer'
 
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True  # For development only
