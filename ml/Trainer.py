@@ -1,3 +1,4 @@
+import csv
 import os
 from models.Decoder import Decoder
 from models.Encoder import Encoder
@@ -128,10 +129,11 @@ class Trainer:
         self.__verbose("Training...", level=1)
         start_time = time.time()
         
-        # Initialize early stopping variables
         self.best_val_loss = float('inf')
         self.patience_counter = 0
         self.best_model_state = None
+
+        metrics = []
         
         for epoch in range(self.num_epochs):
             start = time.time()
@@ -290,6 +292,15 @@ class Trainer:
                     
                     torch.save(self.best_model_state, f"{self.checkpoint_location}/best_model.pth")
                     self.__verbose(f"New best model saved with validation loss: {val_loss:.6f}", level=1)
+
+                    metrics.append({
+                    'epoch': epoch + 1,
+                    'avg_unet_loss': avg_unet_loss,
+                    'avg_point_loss': avg_point_loss,
+                    'avg_total_loss': avg_loss,
+                    'val_loss': val_loss if self.val_dataloader is not None else None
+                    })
+                    
                 else:
                     self.patience_counter += 1
                     self.__verbose(f"No improvement for {self.patience_counter} epochs", level=1)
@@ -320,6 +331,11 @@ class Trainer:
         
         if not os.path.exists(self.model_location):
             os.makedirs(self.model_location)
+
+        with open('epoch_metrics.csv', mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=['epoch', 'avg_unet_loss', 'avg_point_loss', 'avg_total_loss', 'val_loss'])
+            writer.writeheader()
+            writer.writerows(metrics)
 
         torch.save(self.unet.state_dict(), f"{self.model_location}/unet.pth")
         torch.save(self.left_encoder.state_dict(), f"{self.model_location}/left_encoder.pth")
@@ -723,7 +739,11 @@ class Trainer:
         Returns:
             tuple: (left_unet_output, right_unet_output)
         """
-        with torch.amp.autocast(device_type=self.device.type):
-            left_images = left.to(self.device).float() / 255.0
-            right_images = right.to(self.device).float() / 255.0
-            return self.unet(left_images),self.unet(right_images)
+        self.unet.eval()
+        with torch.no_grad():
+            with torch.amp.autocast(device_type=self.device.type):
+                left_images = left.to(self.device).float() / 255.0
+                right_images = right.to(self.device).float() / 255.0
+                left_output = self.unet(left_images)
+                right_output = self.unet(right_images)
+                return left_output, right_output, left_output, right_output

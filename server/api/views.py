@@ -62,7 +62,6 @@ def predict(request):
             logger.info("Starting prediction process")
             result = run_prediction(left_temp_path, right_temp_path)
             
-            logger.info(f"Prediction completed successfully: {result}")
 
             prediction.point_cloud_path = result['point_cloud_path']
             if 'visualization_path' in result:
@@ -77,7 +76,8 @@ def predict(request):
                 'point_cloud_path': prediction.point_cloud_path,
                 'visualization_path': prediction.visualization_path,
                 'metrics': prediction.metrics,
-                'unet_outputs': result.get('unet_outputs', {})
+                'unet_outputs': result.get('unet_outputs', {}),
+                'depth_values': result.get('depth_values',{}),
             })
             
         except Exception as e:
@@ -270,7 +270,7 @@ def run_prediction(left_image, right_image):
         model_location = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../ml/Trained_Models"))
         logger.info(f"Loading models from {model_location}")
         
-        trainer = Trainer(model_location=model_location,verbose=1)
+        trainer = Trainer(model_location=model_location,verbose=0)
         
         trainer.load_model()
         
@@ -279,13 +279,49 @@ def run_prediction(left_image, right_image):
         os.makedirs(os.path.dirname(point_cloud_path), exist_ok=True)
         
         logger.info("Prediction is starting")
-        point_cloud, metrics = trainer.predict(left_img, right_img, save_path=point_cloud_path)
+        point_cloud, _ = trainer.predict(left_img, right_img, save_path=point_cloud_path)
         
         if point_cloud is None:
             raise ValueError("Failed to generate point cloud")
         
         logger.info(f"Point cloud shape: {point_cloud.shape}")
         logger.info(f"Point cloud type: {type(point_cloud)}")
+        
+        if torch.is_tensor(point_cloud):
+            point_cloud_np = point_cloud.detach().cpu().numpy()
+        else:
+            point_cloud_np = point_cloud
+            
+        if point_cloud_np.ndim > 2:
+            point_cloud_np = point_cloud_np.reshape(-1, 3)
+            
+        center = np.mean(point_cloud_np, axis=0)
+        points_centered = point_cloud_np - center
+        
+        mse = np.mean(np.sum(points_centered ** 2, axis=1))
+        
+        mae = np.mean(np.abs(points_centered))
+        
+        num_points = len(points_centered)
+        sample_size = min(1000, num_points)
+        indices = np.random.choice(num_points, sample_size, replace=False)
+        sampled_points = points_centered[indices]
+        
+        batch_size = 100
+        max_dist = 0
+        for i in range(0, sample_size, batch_size):
+            batch = sampled_points[i:i+batch_size]
+            distances = np.sqrt(np.sum((batch[:, np.newaxis] - points_centered) ** 2, axis=2))
+            batch_max = np.max(distances)
+            max_dist = max(max_dist, batch_max)
+        
+        metrics = {
+            'mse': float(mse),
+            'mae': float(mae),
+            'chamfer': float(max_dist)
+        }
+        
+        logger.info(f"Calculated metrics: {metrics}")
         
         overlay_dir = os.path.join(settings.MEDIA_ROOT, 'point_clouds')
         os.makedirs(overlay_dir, exist_ok=True)
@@ -317,9 +353,11 @@ def run_prediction(left_image, right_image):
             visualization_path = os.path.join('media', 'point_clouds', 'visualizations', f'sample_0_overlay.png')
         
         logger.info("Starting getting unet outputs")
-        left_unet,right_unet = trainer.getUnetOutput(left_img, right_img)
+        left_unet, right_unet, left_depth, right_depth = trainer.getUnetOutput(left_img, right_img)
         
         unet_output_paths = {}
+        depth_values = {}
+        
         if left_unet is not None and right_unet is not None:
             unet_dir = os.path.join(settings.MEDIA_ROOT, 'unet_outputs')
             os.makedirs(unet_dir, exist_ok=True)
@@ -360,11 +398,23 @@ def run_prediction(left_image, right_image):
                 'left': relative_left_unet_path,
                 'right': relative_right_unet_path
             }
+            
+            if left_depth is not None and right_depth is not None:
+                if torch.is_tensor(left_depth):
+                    left_depth = left_depth.detach().cpu().numpy()
+                if torch.is_tensor(right_depth):
+                    right_depth = right_depth.detach().cpu().numpy()
+                
+                depth_values = {
+                    'left': left_depth.flatten().tolist(),
+                    'right': right_depth.flatten().tolist()
+                }
         
         result = {
             'point_cloud_path': relative_point_cloud_path,
             'unet_outputs': unet_output_paths,
-            'metrics': metrics or {}
+            'depth_values': depth_values,
+            'metrics': metrics
         }
         
         if visualization_path:

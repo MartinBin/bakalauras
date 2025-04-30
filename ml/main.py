@@ -109,12 +109,12 @@ def main(args):
         model = Trainer(
             dataloader=train_dataloader,
             val_dataloader=val_dataloader,
-            num_epochs=50, 
+            num_epochs=100, 
             checkpoint_location="./Checkpoints", 
             verbose=verbose,
-            early_stopping_patience=5,
+            early_stopping_patience=10,
             early_stopping_min_delta=0.001,
-            learning_rate=0.001 
+            learning_rate=0.00001 
         )
     except Exception as e:
         print(f"Error initializing dataset or dataloader: {e}")

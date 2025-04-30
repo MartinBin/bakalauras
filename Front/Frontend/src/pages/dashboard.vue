@@ -4,8 +4,9 @@ import axios from 'axios'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
-import { usePredictionStore } from '@/stores/predictionStore.ts'
+import { usePredictionStore } from '@/stores/predictionStore'
 import { useRouter } from 'vue-router'
+import MetricsChart from '@/components/MetricsChart.vue'
 
 const router = useRouter()
 const predictionStore = usePredictionStore()
@@ -26,6 +27,24 @@ const controls = ref<OrbitControls | null>(null)
 const pointCloud = ref<THREE.Points | null>(null)
 const animationFrameId = ref<number | null>(null)
 const viewerError = ref(false)
+const currentMetrics = ref<{
+  mse?: number
+  mae?: number
+  chamfer?: number
+} | null>(null)
+const depthValues = ref<{ left: number[]; right: number[] } | null>(null)
+const hoverDepth = ref<{ left: number | null; right: number | null }>({ left: null, right: null })
+const hoverPosition = ref<{ left: { x: number; y: number } | null; right: { x: number; y: number } | null }>({ left: null, right: null })
+const pointSize = ref(0.01)
+const showStats = ref(false)
+const pointCloudStats = ref<{
+  pointCount: number
+  boundingBox: {
+    min: THREE.Vector3
+    max: THREE.Vector3
+    dimensions: THREE.Vector3
+  }
+} | null>(null)
 
 const initViewer = () => {
   if (!viewerContainer.value)
@@ -84,6 +103,15 @@ const animate = () => {
   renderer.value.render(scene.value, camera.value)
 }
 
+const updatePointSize = () => {
+  if (pointCloud.value && pointCloud.value.material) {
+    if (Array.isArray(pointCloud.value.material))
+      pointCloud.value.material.forEach(material => (material as THREE.PointsMaterial).size = pointSize.value)
+    else
+      (pointCloud.value.material as THREE.PointsMaterial).size = pointSize.value
+  }
+}
+
 const loadPointCloud = async (url: string) => {
   console.log('loadPointCloud called with URL:', url)
   viewerError.value = false
@@ -95,7 +123,6 @@ const loadPointCloud = async (url: string) => {
       controls: !!controls.value,
     })
     viewerError.value = true
-
     return
   }
 
@@ -107,22 +134,34 @@ const loadPointCloud = async (url: string) => {
 
   try {
     const loader = new PLYLoader()
-
     const response = await fetch(url)
     if (!response.ok)
       throw new Error(`Failed to fetch PLY file: ${response.status} ${response.statusText}`)
 
     const blob = await response.blob()
-
     const objectUrl = URL.createObjectURL(blob)
-
     const geometry = await loader.loadAsync(objectUrl)
-
     URL.revokeObjectURL(objectUrl)
 
+    const positions = geometry.attributes.position.array
+    const pointCount = positions.length / 3
+    const boundingBox = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position as THREE.BufferAttribute)
+    const dimensions = new THREE.Vector3()
+    boundingBox.getSize(dimensions)
+
+    pointCloudStats.value = {
+      pointCount,
+      boundingBox: {
+        min: boundingBox.min.clone(),
+        max: boundingBox.max.clone(),
+        dimensions: dimensions.clone()
+      }
+    }
+
     const material = new THREE.PointsMaterial({
-      size: 0.01,
+      size: pointSize.value,
       vertexColors: true,
+      sizeAttenuation: true
     })
 
     pointCloud.value = new THREE.Points(geometry, material)
@@ -130,15 +169,17 @@ const loadPointCloud = async (url: string) => {
 
     const box = new THREE.Box3().setFromObject(pointCloud.value)
     const center = box.getCenter(new THREE.Vector3())
-    const size = box.getSize(new THREE.Vector3())
-
-    const maxDim = Math.max(size.x, size.y, size.z)
+    const boxSize = box.getSize(new THREE.Vector3())
+    const maxDim = Math.max(boxSize.x, boxSize.y, boxSize.z)
     const fov = camera.value.fov * (Math.PI / 180)
-    const cameraZ = Math.abs(maxDim / Math.tan(fov / 2))
+    const cameraZ = Math.abs(maxDim / Math.tan(fov / 2)) * 1.5
 
     camera.value.position.set(center.x, center.y, center.z + cameraZ)
     camera.value.lookAt(center)
     controls.value.target.copy(center)
+    controls.value.maxDistance = cameraZ * 2
+    controls.value.minDistance = maxDim * 0.1
+
     console.log('Camera positioned')
   }
   catch (err) {
@@ -192,7 +233,6 @@ const checkFileAccessibility = async (url: string): Promise<boolean> => {
 const handleSubmit = async () => {
   if (!leftImage.value || !rightImage.value) {
     error.value = 'Please select both left and right images'
-
     return
   }
 
@@ -201,12 +241,16 @@ const handleSubmit = async () => {
   predictionResult.value = ''
   unetOutputs.value = null
   showUnetOutputs.value = false
+  currentMetrics.value = null
+  depthValues.value = null
+  hoverDepth.value = { left: null, right: null }
+  hoverPosition.value = { left: null, right: null }
 
   const formData = new FormData()
-
   formData.append('left_image', leftImage.value)
   formData.append('right_image', rightImage.value)
   formData.append('return_unet_outputs', 'true')
+  formData.append('return_depth_values', 'true')
 
   try {
     const response = await axios.post('http://localhost:8000/api/predict/', formData, {
@@ -225,7 +269,6 @@ const handleSubmit = async () => {
       else {
         console.error('Could not find media/ in path:', pointCloudUrl)
         error.value = 'Invalid file path returned by server'
-
         return
       }
     }
@@ -247,7 +290,6 @@ const handleSubmit = async () => {
       }
       else {
         error.value = 'Point cloud file is not accessible. Please check server configuration.'
-
         return
       }
     }
@@ -282,9 +324,27 @@ const handleSubmit = async () => {
         left: leftUnetUrl,
         right: rightUnetUrl,
       }
+
+      if (response.data.depth_values) {
+        depthValues.value = {
+          left: response.data.depth_values.left,
+          right: response.data.depth_values.right,
+        }
+      }
     }
     else {
       console.log('No UNet outputs in response')
+    }
+
+    if (response.data.metrics) {
+      currentMetrics.value = response.data.metrics
+      
+      predictionStore.addPrediction({
+        leftImage: leftPreview.value,
+        rightImage: rightPreview.value,
+        predictedPointCloud: predictionResult.value,
+        metrics: response.data.metrics
+      })
     }
 
     await loadPointCloud(predictionResult.value)
@@ -321,6 +381,32 @@ const downloadPointCloud = async () => {
     console.error('Error downloading point cloud:', err)
     error.value = 'Error downloading point cloud'
   }
+}
+
+const handleImageHover = (event: MouseEvent, side: 'left' | 'right') => {
+  if (!depthValues.value) return
+
+  const img = event.target as HTMLImageElement
+  const rect = img.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+
+  const width = img.naturalWidth
+  const height = img.naturalHeight
+
+  const pixelX = Math.floor((x / rect.width) * width)
+  const pixelY = Math.floor((y / rect.height) * height)
+
+  const index = pixelY * width + pixelX
+  if (index >= 0 && index < depthValues.value[side].length) {
+    hoverDepth.value[side] = depthValues.value[side][index]
+    hoverPosition.value[side] = { x: event.clientX, y: event.clientY }
+  }
+}
+
+const handleImageLeave = (side: 'left' | 'right') => {
+  hoverDepth.value[side] = null
+  hoverPosition.value[side] = null
 }
 
 onMounted(() => {
@@ -390,7 +476,6 @@ const viewHistory = () => {
             <VImg
               v-if="leftPreview"
               :src="leftPreview"
-              height="200"
               cover
               class="mt-2"
             />
@@ -416,7 +501,6 @@ const viewHistory = () => {
             <VImg
               v-if="rightPreview"
               :src="rightPreview"
-              height="200"
               cover
               class="mt-2"
             />
@@ -453,6 +537,15 @@ const viewHistory = () => {
         </VAlert>
       </VCol>
 
+      <!-- Metrics Chart -->
+      <VCol
+        v-if="currentMetrics"
+        cols="12"
+        md="4"
+      >
+        <MetricsChart :metrics="currentMetrics" />
+      </VCol>
+
       <!-- UNet Outputs Toggle -->
       <VCol
         v-if="unetOutputs"
@@ -470,6 +563,7 @@ const viewHistory = () => {
       <VCol
         v-if="unetOutputs && showUnetOutputs"
         cols="12"
+        md="8"
       >
         <VCard>
           <VCardTitle>UNet Outputs</VCardTitle>
@@ -482,11 +576,24 @@ const viewHistory = () => {
                 <VCard>
                   <VCardTitle>Left Image UNet Output</VCardTitle>
                   <VCardText>
-                    <VImg
-                      :src="unetOutputs.left"
-                      height="300"
-                      cover
-                    />
+                    <div class="image-container">
+                      <VImg
+                        :src="unetOutputs.left"
+                        cover
+                        @mousemove="(e: MouseEvent) => handleImageHover(e, 'left')"
+                        @mouseleave="() => handleImageLeave('left')"
+                      />
+                      <div
+                        v-if="hoverDepth.left !== null && hoverPosition.left"
+                        class="depth-tooltip"
+                        :style="{
+                          left: `${hoverPosition.left.x}px`,
+                          top: `${hoverPosition.left.y}px`,
+                        }"
+                      >
+                        Depth: {{ hoverDepth.left.toFixed(2) }}
+                      </div>
+                    </div>
                   </VCardText>
                 </VCard>
               </VCol>
@@ -497,11 +604,24 @@ const viewHistory = () => {
                 <VCard>
                   <VCardTitle>Right Image UNet Output</VCardTitle>
                   <VCardText>
-                    <VImg
-                      :src="unetOutputs.right"
-                      height="300"
-                      cover
-                    />
+                    <div class="image-container">
+                      <VImg
+                        :src="unetOutputs.right"
+                        cover
+                        @mousemove="(e: MouseEvent) => handleImageHover(e, 'right')"
+                        @mouseleave="() => handleImageLeave('right')"
+                      />
+                      <div
+                        v-if="hoverDepth.right !== null && hoverPosition.right"
+                        class="depth-tooltip"
+                        :style="{
+                          left: `${hoverPosition.right.x}px`,
+                          top: `${hoverPosition.right.y}px`,
+                        }"
+                      >
+                        Depth: {{ hoverDepth.right.toFixed(2) }}
+                      </div>
+                    </div>
                   </VCardText>
                 </VCard>
               </VCol>
@@ -540,6 +660,69 @@ const viewHistory = () => {
                 Download Point Cloud (PLY)
               </VBtn>
             </div>
+
+
+            <div v-if="!viewerError" class="point-cloud-controls mt-4">
+              <VRow>
+                <VCol cols="12" md="6">
+                  <VSlider
+                    v-model="pointSize"
+                    label="Point Size"
+                    min="0.001"
+                    max="0.1"
+                    step="0.001"
+                    @update:model-value="updatePointSize"
+                  />
+                </VCol>
+                <VCol cols="12" md="6">
+                  <VBtn
+                    color="secondary"
+                    @click="showStats = !showStats"
+                  >
+                    {{ showStats ? 'Hide Stats' : 'Show Stats' }}
+                  </VBtn>
+                </VCol>
+              </VRow>
+
+              <!-- Point Cloud Statistics -->
+              <VExpansionPanels v-if="showStats && pointCloudStats" class="mt-4">
+                <VExpansionPanel>
+                  <VExpansionPanelTitle>Point Cloud Statistics</VExpansionPanelTitle>
+                  <VExpansionPanelText>
+                    <VList>
+                      <VListItem>
+                        <VListItemTitle>Total Points</VListItemTitle>
+                        <VListItemSubtitle>{{ pointCloudStats.pointCount.toLocaleString() }}</VListItemSubtitle>
+                      </VListItem>
+                      <VListItem>
+                        <VListItemTitle>Bounding Box Dimensions</VListItemTitle>
+                        <VListItemSubtitle>
+                          X: {{ pointCloudStats.boundingBox.dimensions.x.toFixed(2) }},
+                          Y: {{ pointCloudStats.boundingBox.dimensions.y.toFixed(2) }},
+                          Z: {{ pointCloudStats.boundingBox.dimensions.z.toFixed(2) }}
+                        </VListItemSubtitle>
+                      </VListItem>
+                      <VListItem>
+                        <VListItemTitle>Bounding Box Min</VListItemTitle>
+                        <VListItemSubtitle>
+                          X: {{ pointCloudStats.boundingBox.min.x.toFixed(2) }},
+                          Y: {{ pointCloudStats.boundingBox.min.y.toFixed(2) }},
+                          Z: {{ pointCloudStats.boundingBox.min.z.toFixed(2) }}
+                        </VListItemSubtitle>
+                      </VListItem>
+                      <VListItem>
+                        <VListItemTitle>Bounding Box Max</VListItemTitle>
+                        <VListItemSubtitle>
+                          X: {{ pointCloudStats.boundingBox.max.x.toFixed(2) }},
+                          Y: {{ pointCloudStats.boundingBox.max.y.toFixed(2) }},
+                          Z: {{ pointCloudStats.boundingBox.max.z.toFixed(2) }}
+                        </VListItemSubtitle>
+                      </VListItem>
+                    </VList>
+                  </VExpansionPanelText>
+                </VExpansionPanel>
+              </VExpansionPanels>
+            </div>
           </VCardText>
         </VCard>
       </VCol>
@@ -557,12 +740,38 @@ const viewHistory = () => {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
+.point-cloud-controls {
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 16px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 .point-cloud-viewer {
   width: 100%;
   height: 500px;
   background-color: #f0f0f0;
   border-radius: 4px;
   overflow: hidden;
+  position: relative;
+}
+
+.image-container {
+  position: relative;
+  display: inline-block;
+}
+
+.depth-tooltip {
+  position: fixed;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1000;
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
 }
 </style>
 
