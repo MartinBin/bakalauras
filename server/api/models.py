@@ -1,8 +1,10 @@
 from mongoengine import Document, DateTimeField, StringField, DictField, EmailField, BooleanField
 from datetime import datetime
 from django.contrib.auth.hashers import make_password, check_password
+from mongoengine import ReferenceField
 
 class PredictionResult(Document):
+    user = ReferenceField('User', required=True)
     created_at = DateTimeField(default=datetime.utcnow)
     point_cloud_path = StringField(required=True, max_length=255)
     visualization_path = StringField(max_length=255)
@@ -41,7 +43,7 @@ class User(Document):
     
     @property
     def id(self):
-        return str(self._id)
+        return str(self.id)
     
     @property
     def is_anonymous(self):
@@ -53,4 +55,4 @@ class User(Document):
     
     @property
     def pk(self):
-        return self._id
+        return self.id

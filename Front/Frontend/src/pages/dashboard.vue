@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import axios from 'axios'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
 import { usePredictionStore } from '@/stores/predictionStore'
 import { useRouter } from 'vue-router'
 import MetricsChart from '@/components/MetricsChart.vue'
+import api from '../utils/axiosSetup'
 
 const router = useRouter()
 const predictionStore = usePredictionStore()
@@ -219,7 +219,7 @@ const handleRightImageChange = (event: Event) => {
 
 const checkFileAccessibility = async (url: string): Promise<boolean> => {
   try {
-    const response = await axios.head(url)
+    const response = await api.head(url)
 
     return response.status === 200
   }
@@ -253,11 +253,13 @@ const handleSubmit = async () => {
   formData.append('return_depth_values', 'true')
 
   try {
-    const response = await axios.post('http://localhost:8000/api/predict/', formData, {
+    const response = await api.post('/predict/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     })
+
+    initViewer()
 
     let pointCloudUrl = response.data.point_cloud_path
 
@@ -363,7 +365,7 @@ const downloadPointCloud = async () => {
     return
 
   try {
-    const response = await axios.get(predictionResult.value, {
+    const response = await api.get(predictionResult.value, {
       responseType: 'blob',
     })
 
@@ -563,7 +565,6 @@ const viewHistory = () => {
       <VCol
         v-if="unetOutputs && showUnetOutputs"
         cols="12"
-        md="8"
       >
         <VCard>
           <VCardTitle>UNet Outputs</VCardTitle>
@@ -576,24 +577,10 @@ const viewHistory = () => {
                 <VCard>
                   <VCardTitle>Left Image UNet Output</VCardTitle>
                   <VCardText>
-                    <div class="image-container">
-                      <VImg
-                        :src="unetOutputs.left"
-                        cover
-                        @mousemove="(e: MouseEvent) => handleImageHover(e, 'left')"
-                        @mouseleave="() => handleImageLeave('left')"
-                      />
-                      <div
-                        v-if="hoverDepth.left !== null && hoverPosition.left"
-                        class="depth-tooltip"
-                        :style="{
-                          left: `${hoverPosition.left.x}px`,
-                          top: `${hoverPosition.left.y}px`,
-                        }"
-                      >
-                        Depth: {{ hoverDepth.left.toFixed(2) }}
-                      </div>
-                    </div>
+                    <VImg
+                      :src="unetOutputs.left"
+                      cover
+                    />
                   </VCardText>
                 </VCard>
               </VCol>
@@ -604,24 +591,10 @@ const viewHistory = () => {
                 <VCard>
                   <VCardTitle>Right Image UNet Output</VCardTitle>
                   <VCardText>
-                    <div class="image-container">
-                      <VImg
-                        :src="unetOutputs.right"
-                        cover
-                        @mousemove="(e: MouseEvent) => handleImageHover(e, 'right')"
-                        @mouseleave="() => handleImageLeave('right')"
-                      />
-                      <div
-                        v-if="hoverDepth.right !== null && hoverPosition.right"
-                        class="depth-tooltip"
-                        :style="{
-                          left: `${hoverPosition.right.x}px`,
-                          top: `${hoverPosition.right.y}px`,
-                        }"
-                      >
-                        Depth: {{ hoverDepth.right.toFixed(2) }}
-                      </div>
-                    </div>
+                    <VImg
+                      :src="unetOutputs.right"
+                      cover
+                    />
                   </VCardText>
                 </VCard>
               </VCol>

@@ -12,10 +12,10 @@
       </VBtn>
     </VCardTitle>
 
-    <VCardText>
+    <VCardText class="w-100">
       <VRow>
-        <VCol cols="12" md="8">
-          <VTable v-if="predictions.length > 0">
+        <VCol cols="12" class="w-100">
+          <VTable v-if="predictions.length > 0" class="w-100">
             <thead>
               <tr>
                 <th>Date</th>
@@ -47,7 +47,7 @@
                   />
                 </td>
                 <td>
-                  <div v-if="prediction.metrics">
+                  <div v-if="prediction.metrics && prediction.metrics.mse != null">
                     <div>MSE: {{ prediction.metrics.mse.toFixed(4) }}</div>
                     <div>MAE: {{ prediction.metrics.mae.toFixed(4) }}</div>
                     <div>Chamfer: {{ prediction.metrics.chamfer.toFixed(4) }}</div>
@@ -118,16 +118,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { onMounted } from 'vue'
+import api from '../utils/axiosSetup'
+import { ref } from 'vue'
 import { usePredictionStore } from '@/stores/predictionStore'
-import type { Prediction } from '@/stores/predictionStore'
 import MetricsChart from '@/components/MetricsChart.vue'
 
-const predictionStore = usePredictionStore()
+type Prediction = {
+  id: string
+  timestamp: number
+  leftImage?: string
+  rightImage?: string
+  predictedPointCloud?: string
+  metrics: {
+    mse: number
+    mae: number
+    chamfer: number
+  } | null
+}
+
 const showPointCloudViewer = ref(false)
 const selectedPrediction = ref<Prediction | null>(null)
 
-const predictions = computed(() => predictionStore.predictions)
+const predictions = ref<Prediction[]>([])
+
+onMounted(async () => {
+  const response = await api.get('/user/predictions/history')
+  predictions.value = response.data.map((item: any) => ({
+    id: item.id,
+    timestamp: new Date(item.created_at).getTime(),
+    leftImage: `http://localhost:8000/${item.metadata.left_image_path}`,
+    rightImage: `http://localhost:8000/${item.metadata.right_image_path}`,
+    predictedPointCloud: item.visualization_path ? `/${item.visualization_path.replace(/\\/g, '/')}` : '',
+    metrics: item.metrics || null,
+  }))
+})
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp).toLocaleString()
@@ -138,13 +163,16 @@ const viewPointCloud = (prediction: Prediction) => {
   showPointCloudViewer.value = true
 }
 
-const removePrediction = (id: string) => {
-  predictionStore.removePrediction(id)
+const removePrediction = async (id: string) => {
+  await api.delete(`/user/predictions/${id}/`)
+  predictions.value = predictions.value.filter(p => p.id !== id)
 }
 
-const clearHistory = () => {
-  predictionStore.clearPredictions()
+const clearHistory = async () => {
+  await api.delete(`/user/predictions`)
+  predictions.value=[]
 }
+
 </script>
 
 <style scoped>
