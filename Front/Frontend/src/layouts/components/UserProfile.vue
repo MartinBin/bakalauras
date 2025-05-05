@@ -7,6 +7,8 @@ import { useAuthStore } from '@/stores/authStore'
 const authStore = useAuthStore()
 const router = useRouter()
 
+
+
 const logout = () => {
   authStore.logout()
   router.push('/login')
@@ -59,41 +61,10 @@ const logout = () => {
             </template>
 
             <VListItemTitle class="font-weight-semibold">
-              John Doe
+              {{ authStore.user?.username || 'Guest' }}
             </VListItemTitle>
-            <VListItemSubtitle>Admin</VListItemSubtitle>
           </VListItem>
           <VDivider class="my-2" />
-
-          <!-- 👉 Profile -->
-          <VListItem link>
-            <template #prepend>
-              <VIcon
-                class="me-2"
-                icon="ri-user-line"
-                size="22"
-              />
-            </template>
-
-            <VListItemTitle>Profile</VListItemTitle>
-          </VListItem>
-
-          <!-- 👉 Settings -->
-          <VListItem link>
-            <template #prepend>
-              <VIcon
-                class="me-2"
-                icon="ri-settings-4-line"
-                size="22"
-              />
-            </template>
-
-            <VListItemTitle>Settings</VListItemTitle>
-          </VListItem>
-
-          <!-- Divider -->
-          <VDivider class="my-2" />
-
           <!-- 👉 Logout -->
           <VListItem @click="logout">
             <template #prepend>

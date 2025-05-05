@@ -1,12 +1,12 @@
 import csv
 import os
-from models.Decoder import Decoder
-from models.Encoder import Encoder
+from api.ai.models.Decoder import Decoder
+from api.ai.models.Encoder import Encoder
 import torch
 import numpy as np
 import open3d as o3d
 import time
-from models.Unet import UNet
+from api.ai.models.Unet import UNet
 from datetime import timedelta
 
 def format_time(seconds):

@@ -3,13 +3,11 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
-import { usePredictionStore } from '@/stores/predictionStore'
 import { useRouter } from 'vue-router'
 import MetricsChart from '@/components/MetricsChart.vue'
 import api from '../utils/axiosSetup'
 
 const router = useRouter()
-const predictionStore = usePredictionStore()
 const leftImage = ref<File | null>(null)
 const rightImage = ref<File | null>(null)
 const leftPreview = ref<string>('')
@@ -340,13 +338,6 @@ const handleSubmit = async () => {
 
     if (response.data.metrics) {
       currentMetrics.value = response.data.metrics
-      
-      predictionStore.addPrediction({
-        leftImage: leftPreview.value,
-        rightImage: rightPreview.value,
-        predictedPointCloud: predictionResult.value,
-        metrics: response.data.metrics
-      })
     }
 
     await loadPointCloud(predictionResult.value)

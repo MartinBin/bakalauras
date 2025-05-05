@@ -12,7 +12,6 @@ const form = ref({
   username: '',
   email: '',
   password: '',
-  privacyPolicies: false,
 })
 
 const vuetifyTheme = useTheme()
@@ -23,7 +22,11 @@ const authThemeMask = computed(() => {
     : authV1MaskDark
 })
 
-const errorMessage = ref('')
+const errorMessage = ref({
+  username: '',
+  email: '',
+  password: '',
+})
 
 const isPasswordVisible = ref(false)
 
@@ -38,8 +41,27 @@ const register = async () => {
     })
     router.push('/login')
   }
-  catch (error) {
-    errorMessage.value = 'Registration failed. Check your inputs.'
+  catch (error: any) {
+    errorMessage.value = {
+      username: '',
+      email: '',
+      password: '',
+    };
+
+    if (error.response && error.response.data) {
+      const errors = error.response.data;
+      if (errors.username) {
+        errorMessage.value.username = errors.username;
+      }
+      if (errors.email) {
+        errorMessage.value.email = errors.email;
+      }
+      if (errors.password) {
+        errorMessage.value.password = errors.password;
+      }
+    } else {
+      errorMessage.value.email = 'Registration failed. Check your inputs.';
+    }
   }
 }
 </script>
@@ -76,6 +98,8 @@ const register = async () => {
                 v-model="form.username"
                 label="Username"
                 placeholder="Johndoe"
+                :error="!!errorMessage.username"
+                :error-messages="errorMessage.username"
               />
             </VCol>
             <!-- email -->
@@ -85,6 +109,8 @@ const register = async () => {
                 label="Email"
                 placeholder="johndoe@email.com"
                 type="email"
+                :error="!!errorMessage.email"
+                :error-messages="errorMessage.email"
               />
             </VCol>
 
@@ -98,6 +124,8 @@ const register = async () => {
                 autocomplete="password"
                 :append-inner-icon="isPasswordVisible ? 'ri-eye-off-line' : 'ri-eye-line'"
                 @click:append-inner="isPasswordVisible = !isPasswordVisible"
+                :error="!!errorMessage.password"
+                :error-messages="errorMessage.password"
               />
             </VCol>
             <VCol cols ="12">

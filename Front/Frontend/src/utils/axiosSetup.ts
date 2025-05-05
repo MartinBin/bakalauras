@@ -8,10 +8,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async config => {
-    const authStore = useAuthStore()
-    if (authStore.accessToken)
-      config.headers.Authorization = `Bearer ${authStore.accessToken}`
-
+    config.withCredentials=true
     return config
   },
   error => Promise.reject(error),
@@ -26,9 +23,8 @@ api.interceptors.response.use(
     if (error.response.status === 401) {
       try {
         await authStore.refreshTokenRequest()
-        error.config.headers.Authorization = `Bearer ${authStore.accessToken}`
 
-        return api.request(error.config)
+        return api.request({...error.config, withCredentials:true,})
       }
       catch (refreshError) {
         authStore.logout()
