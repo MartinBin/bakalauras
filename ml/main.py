@@ -6,13 +6,7 @@ from torch.utils.data import DataLoader, random_split
 from Trainer import Trainer
 import argparse
 import sys
-import os
 import torch
-from PIL import Image
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import open3d as o3d
 
 
 def create_train_val_dataloaders(dataset, batch_size=6, val_split=0.2, seed=42, num_workers=0):
@@ -138,39 +132,14 @@ def main(args):
             model.load_model()
 
             for i, data in enumerate(train_dataloader, 0):
-                left_images, left_depths, right_images, right_depths, target_point_cloud = data
+                left_images, right_images, target_point_cloud = data
                 
-                predicted_point_cloud, metrics = model.predict(
+                metrics = model.predict(
                     left_image=left_images, 
                     right_image=right_images,
                     target_point_cloud=target_point_cloud,
                     save_path=f"./predictions/sample_{i}"
                 )
-
-                left,right=model.getUnetOutput(left_images,right_images)
-
-                unet_dir = os.path.join('./predictions', 'unet_outputs')
-                os.makedirs(unet_dir, exist_ok=True)
-                
-                if torch.is_tensor(left):
-                    left_unet = left.detach().cpu().numpy()
-                if torch.is_tensor(right):
-                    right_unet = right.detach().cpu().numpy()
-                
-                left_unet = np.transpose(left_unet[0], (1, 2, 0))
-                right_unet = np.transpose(right_unet[0], (1, 2, 0))
-                
-                left_unet = np.clip(left_unet * 255, 0, 255).astype(np.uint8)
-                right_unet = np.clip(right_unet * 255, 0, 255).astype(np.uint8)
-                
-                left_unet_img = Image.fromarray(left_unet)
-                right_unet_img = Image.fromarray(right_unet)
-                
-                left_unet_path = os.path.join(unet_dir, f'left_unet.png')
-                right_unet_path = os.path.join(unet_dir, f'right_unet.png')
-                
-                left_unet_img.save(left_unet_path)
-                right_unet_img.save(right_unet_path)
                 
                 if metrics:
                     total_mse += metrics['mse']

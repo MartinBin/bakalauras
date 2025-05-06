@@ -18,17 +18,24 @@ const viewerError = ref(false)
 const dialog = ref(false)
 const selectedFile = ref<string | undefined>()
 
+const showDepth = ref(false)
+const hoveredDepth = ref<number | null>(null)
+const tooltipX = ref(0)
+const tooltipY = ref(0)
+const leftImageContainer = ref<HTMLElement | null>(null)
+
+const rightImageContainer = ref<HTMLElement | null>(null)
+const showDepthRight = ref(false)
+const hoveredDepthRight = ref<number | null>(null)
+const tooltipXRight = ref(0)
+const tooltipYRight = ref(0)
+
 const currentMetrics = ref<{
   mse?: number
   mae?: number
-  chamfer?: number
 } | null>(null)
 
 const depthValues = ref<{ left: number[]; right: number[] } | null>(null)
-const hoverDepth = ref<{ left: number | null; right: number | null }>({ left: null, right: null })
-const hoverPosition = ref<{ left: { x: number; y: number } | null; right: { x: number; y: number } | null }>({ left: null, right: null })
-const pointSize = ref(0.01)
-const showStats = ref(false)
 
 const handleLeftImageChange = (event: Event) => {
   const input = event.target as HTMLInputElement
@@ -73,8 +80,6 @@ const handleSubmit = async () => {
   showUnetOutputs.value = false
   currentMetrics.value = null
   depthValues.value = null
-  hoverDepth.value = { left: null, right: null }
-  hoverPosition.value = { left: null, right: null }
 
   const formData = new FormData()
 
@@ -206,33 +211,6 @@ const downloadPointCloud = async () => {
   }
 }
 
-const handleImageHover = (event: MouseEvent, side: 'left' | 'right') => {
-  if (!depthValues.value)
-    return
-
-  const img = event.target as HTMLImageElement
-  const rect = img.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const y = event.clientY - rect.top
-
-  const width = img.naturalWidth
-  const height = img.naturalHeight
-
-  const pixelX = Math.floor((x / rect.width) * width)
-  const pixelY = Math.floor((y / rect.height) * height)
-
-  const index = pixelY * width + pixelX
-  if (index >= 0 && index < depthValues.value[side].length) {
-    hoverDepth.value[side] = depthValues.value[side][index]
-    hoverPosition.value[side] = { x: event.clientX, y: event.clientY }
-  }
-}
-
-const handleImageLeave = (side: 'left' | 'right') => {
-  hoverDepth.value[side] = null
-  hoverPosition.value[side] = null
-}
-
 const viewHistory = () => {
   router.push('/prediction-history')
 }
@@ -241,6 +219,81 @@ const viewPointCloud = (predictionResult: string) => {
   selectedFile.value = predictionResult
   dialog.value = true
 }
+
+const depthWidth = 512
+const depthHeight = 512
+
+const handleMouseMove = (event: MouseEvent) => {
+  const container = leftImageContainer.value
+  const depthArray = depthValues.value?.left
+  if (!container || !depthArray) return
+
+  const rect = container.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+
+  const imageWidth = container.offsetWidth
+  const imageHeight = container.offsetHeight
+
+  const pixelX = Math.floor((x / imageWidth) * depthWidth)
+  const pixelY = Math.floor((y / imageHeight) * depthHeight)
+
+  const index = pixelY * depthWidth + pixelX
+
+  if (
+    pixelX >= 0 && pixelX < depthWidth &&
+    pixelY >= 0 && pixelY < depthHeight &&
+    index < depthArray.length
+  ) {
+    hoveredDepth.value = depthArray[index]
+    tooltipX.value = x
+    tooltipY.value = y
+    showDepth.value = true
+  } else {
+    showDepth.value = false
+  }
+}
+
+const tooltipStyle = computed(() => ({
+  top: `${tooltipY.value + 10}px`,
+  left: `${tooltipX.value + 10}px`
+}))
+
+const handleMouseMoveRight = (event: MouseEvent) => {
+  const container = rightImageContainer.value
+  const depthArray = depthValues.value?.right
+  if (!container || !depthArray) return
+
+  const rect = container.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+
+  const imageWidth = container.offsetWidth
+  const imageHeight = container.offsetHeight
+
+  const pixelX = Math.floor((x / imageWidth) * depthWidth)
+  const pixelY = Math.floor((y / imageHeight) * depthHeight)
+
+  const index = pixelY * depthWidth + pixelX
+
+  if (
+    pixelX >= 0 && pixelX < depthWidth &&
+    pixelY >= 0 && pixelY < depthHeight &&
+    index < depthArray.length
+  ) {
+    hoveredDepthRight.value = depthArray[index]
+    tooltipXRight.value = x
+    tooltipYRight.value = y
+    showDepthRight.value = true
+  } else {
+    showDepthRight.value = false
+  }
+}
+
+const tooltipStyleRight = computed(() => ({
+  top: `${tooltipYRight.value + 10}px`,
+  left: `${tooltipXRight.value + 10}px`
+}))
 </script>
 
 <template>
@@ -375,10 +428,17 @@ const viewPointCloud = (predictionResult: string) => {
                 <VCard>
                   <VCardTitle>Left Image UNet Output</VCardTitle>
                   <VCardText>
-                    <VImg
-                      :src="unetOutputs.left"
-                      cover
-                    />
+                    <div
+                      class="depth-hover-container"
+                      @mousemove="handleMouseMove"
+                      @mouseleave="showDepth = false"
+                      ref="leftImageContainer"
+                    >
+                      <VImg :src="unetOutputs.left" cover />
+                      <div v-if="showDepth" class="depth-tooltip" :style="tooltipStyle">
+                        Depth: {{ hoveredDepth?.toFixed(2) }}
+                      </div>
+                    </div>
                   </VCardText>
                 </VCard>
               </VCol>
@@ -389,10 +449,17 @@ const viewPointCloud = (predictionResult: string) => {
                 <VCard>
                   <VCardTitle>Right Image UNet Output</VCardTitle>
                   <VCardText>
-                    <VImg
-                      :src="unetOutputs.right"
-                      cover
-                    />
+                    <div
+                      class="depth-hover-container"
+                      @mousemove="handleMouseMoveRight"
+                      @mouseleave="showDepthRight = false"
+                      ref="rightImageContainer"
+                    >
+                      <VImg :src="unetOutputs.right" cover />
+                      <div v-if="showDepthRight" class="depth-tooltip" :style="tooltipStyleRight">
+                        Depth: {{ hoveredDepthRight?.toFixed(2) }}
+                      </div>
+                    </div>
                   </VCardText>
                 </VCard>
               </VCol>
@@ -486,16 +553,18 @@ const viewPointCloud = (predictionResult: string) => {
   display: inline-block;
 }
 
+.depth-hover-container {
+  position: relative;
+}
+
 .depth-tooltip {
-  position: fixed;
-  background-color: rgba(0, 0, 0, 0.8);
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.75);
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 14px;
   pointer-events: none;
-  z-index: 1000;
-  transform: translate(-50%, -100%);
-  margin-top: -10px;
+  z-index: 10;
 }
 </style>

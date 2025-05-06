@@ -53,30 +53,12 @@ def run_prediction(left_image, right_image):
         if point_cloud_np.ndim > 2:
             point_cloud_np = point_cloud_np.reshape(-1, 3)
             
-        center = np.mean(point_cloud_np, axis=0)
-        points_centered = point_cloud_np - center
-        
-        mse = np.mean(np.sum(points_centered ** 2, axis=1))
-        
-        mae = np.mean(np.abs(points_centered))
-        
-        num_points = len(points_centered)
-        sample_size = min(1000, num_points)
-        indices = np.random.choice(num_points, sample_size, replace=False)
-        sampled_points = points_centered[indices]
-        
-        batch_size = 100
-        max_dist = 0
-        for i in range(0, sample_size, batch_size):
-            batch = sampled_points[i:i+batch_size]
-            distances = np.sqrt(np.sum((batch[:, np.newaxis] - points_centered) ** 2, axis=2))
-            batch_max = np.max(distances)
-            max_dist = max(max_dist, batch_max)
+        variance = np.var(point_cloud_np, axis=0)
+        std_dev = np.std(point_cloud_np, axis=0)
         
         metrics = {
-            'mse': float(mse),
-            'mae': float(mae),
-            'chamfer': float(max_dist)
+            'variance': float(np.mean(variance)),
+            'std_dev': float(np.mean(std_dev)),
         }
         
         logger.info(f"Calculated metrics: {metrics}")

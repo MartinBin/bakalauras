@@ -37,6 +37,7 @@ onMounted(async () => {
   controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true
   controls.dampingFactor = 0.05
+  controls.target.set(0, 0, 0)
 
   const loader = new PLYLoader()
 

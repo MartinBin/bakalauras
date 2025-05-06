@@ -13,9 +13,8 @@ import {
 
 const props = defineProps<{
   metrics: {
-    mse?: number
-    mae?: number
-    chamfer?: number
+    variance?: number
+    std_dev?: number
   }
 }>()
 
@@ -33,9 +32,8 @@ const chartData = computed(() => {
     return null
 
   const metrics = [
-    { name: 'MSE', value: props.metrics.mse },
-    { name: 'MAE', value: props.metrics.mae },
-    { name: 'Chamfer', value: props.metrics.chamfer },
+    { name: 'Variance', value: props.metrics.variance },
+    { name: 'Standard deviation', value: props.metrics.std_dev },
   ].filter(metric => metric.value !== undefined)
 
   return {

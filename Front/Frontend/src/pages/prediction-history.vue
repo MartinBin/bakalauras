@@ -9,9 +9,8 @@ interface Prediction {
   rightImage?: string
   predictedPointCloud?: string
   metrics: {
-    mse: number
-    mae: number
-    chamfer: number
+    variance: number
+    std_dev: number
   } | null
 }
 
@@ -111,10 +110,9 @@ const clearHistory = async () => {
                   />
                 </td>
                 <td>
-                  <div v-if="prediction.metrics && prediction.metrics.mse != null">
-                    <div>MSE: {{ prediction.metrics.mse.toFixed(4) }}</div>
-                    <div>MAE: {{ prediction.metrics.mae.toFixed(4) }}</div>
-                    <div>Chamfer: {{ prediction.metrics.chamfer.toFixed(4) }}</div>
+                  <div v-if="prediction.metrics && prediction.metrics.variance != null">
+                    <div>Variance: {{ prediction.metrics.variance.toFixed(4) }}</div>
+                    <div>Standard deviation: {{ prediction.metrics.std_dev.toFixed(4) }}</div>
                   </div>
                   <div v-else>
                     No metrics available
