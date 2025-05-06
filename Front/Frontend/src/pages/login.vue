@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
-import AuthProvider from '@/views/pages/authentication/AuthProvider.vue'
 
-import logo from '@images/logo.svg?raw'
 import authV1MaskDark from '@images/pages/auth-v1-mask-dark.png'
 import authV1MaskLight from '@images/pages/auth-v1-mask-light.png'
 import authV1Tree2 from '@images/pages/auth-v1-tree-2.png'
@@ -50,9 +48,9 @@ const handleLogin = async () => {
       max-width="448"
     >
       <VCardItem class="justify-center">
-          <h2 class="font-weight-medium text-2xl text-uppercase">
-            Wound3D
-          </h2>
+        <h2 class="font-weight-medium text-2xl text-uppercase">
+          Wound3D
+        </h2>
       </VCardItem>
 
       <VCardText class="pt-2">

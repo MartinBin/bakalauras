@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import NavItems from '@/layouts/components/NavItems.vue'
-import logo from '@images/logo.svg?raw'
 import VerticalNavLayout from '@layouts/components/VerticalNavLayout.vue'
 
 // Components
@@ -30,10 +29,6 @@ import UserProfile from '@/layouts/components/UserProfile.vue'
           rel="noopener noreferrer"
         >
           <VIcon icon="ri-github-fill" />
-        </IconBtn>
-
-        <IconBtn>
-          <VIcon icon="ri-notification-line" />
         </IconBtn>
 
         <NavbarThemeSwitcher class="me-2" />

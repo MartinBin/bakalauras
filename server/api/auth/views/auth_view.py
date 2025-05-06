@@ -106,23 +106,24 @@ def logout(request):
     return response
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def refresh(request):
-    serializer = UserSerializer(request.user)
-    user = serializer.data
-    
+@permission_classes([AllowAny])
+def refresh(request):    
     refresh_token = request.COOKIES.get('refreshToken')
     if not refresh_token:
         return Response({'detail': 'No refresh token provided'}, status=400)
     try:
         token_record = UserRefreshToken.objects.get(token=refresh_token)
         token = RefreshToken(refresh_token)
+        
+        user_id = token['user_id']
+        user = User.objects.get(id=user_id)
+
         access_token = token.access_token
         refresh_token = token
 
         token_record.delete()
 
-        UserRefreshToken.objects.create(user=user, token=str(refresh))
+        UserRefreshToken.objects.create(user=user, token=str(token))
 
         response = Response({'message': 'Token refreshed'})
 

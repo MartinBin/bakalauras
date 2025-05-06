@@ -1,5 +1,5 @@
 export const routes = [
-  { path: '/', redirect: '/dashboard', meta: {requiresAuth: true} },
+  { path: '/', redirect: '/dashboard', meta: { requiresAuth: true } },
   {
     path: '/',
     component: () => import('@/layouts/default.vue'),

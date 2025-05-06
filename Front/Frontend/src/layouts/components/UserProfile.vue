@@ -7,8 +7,6 @@ import { useAuthStore } from '@/stores/authStore'
 const authStore = useAuthStore()
 const router = useRouter()
 
-
-
 const logout = () => {
   authStore.logout()
   router.push('/login')

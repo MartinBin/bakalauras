@@ -1,24 +1,22 @@
 <script lang="ts" setup>
 import VerticalNavSectionTitle from '@/@layouts/components/VerticalNavSectionTitle.vue'
-import VerticalNavGroup from '@layouts/components/VerticalNavGroup.vue'
 import VerticalNavLink from '@layouts/components/VerticalNavLink.vue'
 </script>
 
 <template>
-  <!-- 👉 Dashboards -->
-  <VerticalNavGroup
+  <VerticalNavSectionTitle :item="{ heading: '3D wound generation model' }" />
+  <VerticalNavLink
     :item="{
-      title: 'Dashboards',
-      //badgeContent: '5',
-      //badgeClass: 'bg-error',
-      icon: 'ri-home-smile-line',
+      title: 'Generate 3D',
+      to: '/dashboard',
+
     }"
-  >
-    <VerticalNavLink
-      :item="{
-        title: 'Generate 3D',
-        to: '/dashboard',
-      }"
-    />
-  </VerticalNavGroup>
+  />
+
+  <VerticalNavLink
+    :item="{
+      title: 'Prediction History',
+      to: '/prediction-history',
+    }"
+  />
 </template>

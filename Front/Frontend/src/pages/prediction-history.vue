@@ -1,3 +1,58 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import api from '../utils/axiosSetup'
+
+interface Prediction {
+  id: string
+  timestamp: number
+  leftImage?: string
+  rightImage?: string
+  predictedPointCloud?: string
+  metrics: {
+    mse: number
+    mae: number
+    chamfer: number
+  } | null
+}
+
+const dialog = ref(false)
+const selectedFile = ref<string | undefined>()
+
+const predictions = ref<Prediction[]>([])
+
+onMounted(async () => {
+  const response = await api.get('/user/predictions/history')
+
+  predictions.value = response.data.map((item: any) => ({
+    id: item.id,
+    timestamp: new Date(item.created_at).getTime(),
+    leftImage: `http://localhost:8000/${item.metadata.left_image_path}`,
+    rightImage: `http://localhost:8000/${item.metadata.right_image_path}`,
+    predictedPointCloud: item.point_cloud_path ? `/${item.point_cloud_path.replace(/\\/g, '/')}` : '',
+    metrics: item.metrics || null,
+  }))
+})
+
+const formatDate = (timestamp: number) => {
+  return new Date(timestamp).toLocaleString()
+}
+
+const viewPointCloud = (prediction: Prediction) => {
+  selectedFile.value = "http://localhost:8000"+prediction.predictedPointCloud
+  dialog.value = true
+}
+
+const removePrediction = async (id: string) => {
+  await api.delete(`/user/predictions/${id}/`)
+  predictions.value = predictions.value.filter(p => p.id !== id)
+}
+
+const clearHistory = async () => {
+  await api.delete('/user/predictions')
+  predictions.value = []
+}
+</script>
+
 <template>
   <VCard>
     <VCardTitle class="d-flex justify-space-between align-center pa-4">
@@ -14,8 +69,14 @@
 
     <VCardText class="w-100">
       <VRow>
-        <VCol cols="12" class="w-100">
-          <VTable v-if="predictions.length > 0" class="w-100">
+        <VCol
+          cols="12"
+          class="w-100"
+        >
+          <VTable
+            v-if="predictions.length > 0"
+            class="w-100"
+          >
             <thead>
               <tr>
                 <th>Date</th>
@@ -26,7 +87,10 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="prediction in predictions" :key="prediction.id">
+              <tr
+                v-for="prediction in predictions"
+                :key="prediction.id"
+              >
                 <td>{{ formatDate(prediction.timestamp) }}</td>
                 <td>
                   <VImg
@@ -52,7 +116,9 @@
                     <div>MAE: {{ prediction.metrics.mae.toFixed(4) }}</div>
                     <div>Chamfer: {{ prediction.metrics.chamfer.toFixed(4) }}</div>
                   </div>
-                  <div v-else>No metrics available</div>
+                  <div v-else>
+                    No metrics available
+                  </div>
                 </td>
                 <td>
                   <VBtn
@@ -64,6 +130,29 @@
                   >
                     View Point Cloud
                   </VBtn>
+
+                  <VDialog
+                    v-model="dialog"
+                    fullscreen
+                  >
+                    <VCard>
+                      <VCardTitle class="d-flex justify-space-between align-center">
+                        Point Cloud Viewer
+                        <VBtn
+                          icon
+                          @click="dialog = false"
+                        >
+                          <VIcon icon="ri-close-line" />
+                        </VBtn>
+                      </VCardTitle>
+                      <VCardText class="pa-0">
+                        <PointCloudViewer
+                          v-if="selectedFile"
+                          :file-path="selectedFile"
+                        />
+                      </VCardText>
+                    </VCard>
+                  </VDialog>
                   <VBtn
                     color="error"
                     variant="text"
@@ -86,94 +175,8 @@
         </VCol>
       </VRow>
     </VCardText>
-
-    <!-- Point Cloud Viewer Dialog -->
-    <VDialog
-      v-model="showPointCloudViewer"
-      max-width="800"
-    >
-      <VCard>
-        <VCardTitle class="d-flex justify-space-between align-center pa-4">
-          Point Cloud Viewer
-          <VBtn
-            icon
-            variant="text"
-            @click="showPointCloudViewer = false"
-          >
-            <VIcon>ri-close-line</VIcon>
-          </VBtn>
-        </VCardTitle>
-        <VCardText>
-          <div v-if="selectedPrediction" class="point-cloud-container">
-            <img
-              :src="selectedPrediction.predictedPointCloud"
-              alt="Predicted Point Cloud"
-              class="w-100"
-            />
-          </div>
-        </VCardText>
-      </VCard>
-    </VDialog>
   </VCard>
 </template>
-
-<script setup lang="ts">
-import { onMounted } from 'vue'
-import api from '../utils/axiosSetup'
-import { ref } from 'vue'
-import { usePredictionStore } from '@/stores/predictionStore'
-import MetricsChart from '@/components/MetricsChart.vue'
-
-type Prediction = {
-  id: string
-  timestamp: number
-  leftImage?: string
-  rightImage?: string
-  predictedPointCloud?: string
-  metrics: {
-    mse: number
-    mae: number
-    chamfer: number
-  } | null
-}
-
-const showPointCloudViewer = ref(false)
-const selectedPrediction = ref<Prediction | null>(null)
-
-const predictions = ref<Prediction[]>([])
-
-onMounted(async () => {
-  const response = await api.get('/user/predictions/history')
-  predictions.value = response.data.map((item: any) => ({
-    id: item.id,
-    timestamp: new Date(item.created_at).getTime(),
-    leftImage: `http://localhost:8000/${item.metadata.left_image_path}`,
-    rightImage: `http://localhost:8000/${item.metadata.right_image_path}`,
-    predictedPointCloud: item.visualization_path ? `/${item.visualization_path.replace(/\\/g, '/')}` : '',
-    metrics: item.metrics || null,
-  }))
-})
-
-const formatDate = (timestamp: number) => {
-  return new Date(timestamp).toLocaleString()
-}
-
-const viewPointCloud = (prediction: Prediction) => {
-  selectedPrediction.value = prediction
-  showPointCloudViewer.value = true
-}
-
-const removePrediction = async (id: string) => {
-  await api.delete(`/user/predictions/${id}/`)
-  predictions.value = predictions.value.filter(p => p.id !== id)
-}
-
-const clearHistory = async () => {
-  await api.delete(`/user/predictions`)
-  predictions.value=[]
-}
-
-</script>
 
 <style scoped>
 .point-cloud-container {
@@ -184,4 +187,4 @@ const clearHistory = async () => {
   align-items: center;
   justify-content: center;
 }
-</style> 
+</style>

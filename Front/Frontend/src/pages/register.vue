@@ -2,7 +2,6 @@
 import { useTheme } from 'vuetify'
 import axios from 'axios'
 
-import logo from '@images/logo.svg?raw'
 import authV1MaskDark from '@images/pages/auth-v1-mask-dark.png'
 import authV1MaskLight from '@images/pages/auth-v1-mask-light.png'
 import authV1Tree2 from '@images/pages/auth-v1-tree-2.png'
@@ -46,21 +45,21 @@ const register = async () => {
       username: '',
       email: '',
       password: '',
-    };
+    }
 
     if (error.response && error.response.data) {
-      const errors = error.response.data;
-      if (errors.username) {
-        errorMessage.value.username = errors.username;
-      }
-      if (errors.email) {
-        errorMessage.value.email = errors.email;
-      }
-      if (errors.password) {
-        errorMessage.value.password = errors.password;
-      }
-    } else {
-      errorMessage.value.email = 'Registration failed. Check your inputs.';
+      const errors = error.response.data
+      if (errors.username)
+        errorMessage.value.username = errors.username
+
+      if (errors.email)
+        errorMessage.value.email = errors.email
+
+      if (errors.password)
+        errorMessage.value.password = errors.password
+    }
+    else {
+      errorMessage.value.email = 'Registration failed. Check your inputs.'
     }
   }
 }
@@ -75,9 +74,9 @@ const register = async () => {
       max-width="448"
     >
       <VCardItem class="justify-center">
-          <h2 class="font-weight-medium text-2xl text-uppercase">
-            Wound3D
-          </h2>
+        <h2 class="font-weight-medium text-2xl text-uppercase">
+          Wound3D
+        </h2>
       </VCardItem>
 
       <VCardText class="pt-2">
@@ -123,12 +122,12 @@ const register = async () => {
                 :type="isPasswordVisible ? 'text' : 'password'"
                 autocomplete="password"
                 :append-inner-icon="isPasswordVisible ? 'ri-eye-off-line' : 'ri-eye-line'"
-                @click:append-inner="isPasswordVisible = !isPasswordVisible"
                 :error="!!errorMessage.password"
                 :error-messages="errorMessage.password"
+                @click:append-inner="isPasswordVisible = !isPasswordVisible"
               />
             </VCol>
-            <VCol cols ="12">
+            <VCol cols="12">
               <VBtn
                 block
                 type="submit"

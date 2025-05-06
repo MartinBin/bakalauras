@@ -11,7 +11,7 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(email: string, password: string) {
       try {
-        await axios.post(`${API_URL}/login/`, { email, password }, {withCredentials:true})
+        await axios.post(`${API_URL}/login/`, { email, password }, { withCredentials: true })
 
         await this.fetchUser()
       }
@@ -24,7 +24,7 @@ export const useAuthStore = defineStore('auth', {
     async fetchUser() {
       try {
         const response = await axios.get(`${API_URL}/user/`, {
-          withCredentials:true
+          withCredentials: true,
         })
 
         this.user = response.data
@@ -37,7 +37,7 @@ export const useAuthStore = defineStore('auth', {
     async refreshTokenRequest() {
       try {
         await axios.post(`${API_URL}/refresh/`, {}, {
-          withCredentials:true
+          withCredentials: true,
         })
       }
       catch (error) {
@@ -48,7 +48,7 @@ export const useAuthStore = defineStore('auth', {
 
     logout() {
       this.user = null
-      axios.post(`${API_URL}/logout/`, {}, {withCredentials:true}).catch(err => console.error(err))
+      axios.post(`${API_URL}/logout/`, {}, { withCredentials: true }).catch(err => console.error(err))
     },
   },
 })
