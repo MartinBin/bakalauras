@@ -1,21 +1,20 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from api.auth.views.auth_view import register, login, logout, refresh
-from api.prediction.views.prediction_views import predict,user_prediction_history,delete_all_user_predictions,delete_prediction, PredictionResultViewSet
-from api.user.views.user_views import user
+from api.prediction.views.prediction_view import PredictionView, UserPredictionDetailView, UserPredictionsView, PredictionResultViewSet
+from api.user.views.user_views import UserView
+from api.auth.views.auth_views import LoginView, LogoutView, RefreshTokenView, RegisterView
 
 router = DefaultRouter()
 router.register(r'prediction-results', PredictionResultViewSet, basename='prediction-result')
 
 urlpatterns = [
-    path('auth/registration/', register, name='register'),
-    path('auth/login/', login, name='login'),
-    path('auth/logout/', logout, name='logout'),
-    path('auth/refresh/', refresh,name='refresh_tokens'),
-    path('auth/user/', user, name='user'),
-    path('predict/', predict, name='predict'),
-    path('user/predictions/history', user_prediction_history, name='user_prediction_history'),
-    path('user/predictions/', delete_all_user_predictions, name='delete_all_user_predictions'),
-    path('user/predictions/<str:prediction_id>/', delete_prediction, name='delete_prediction'),
+    path('auth/registration/', RegisterView.as_view()),
+    path('auth/login/', LoginView.as_view()),
+    path('auth/logout/', LogoutView.as_view()),
+    path('auth/refresh/', RefreshTokenView.as_view()),
+    path('auth/user/', UserView.as_view()),
+    path('predict/', PredictionView.as_view()),
+    path('user/predictions/', UserPredictionsView.as_view()),
+    path('user/predictions/<str:prediction_id>/', UserPredictionDetailView.as_view),
     path('', include(router.urls)),
 ]

@@ -31,8 +31,8 @@ const tooltipXRight = ref(0)
 const tooltipYRight = ref(0)
 
 const currentMetrics = ref<{
-  mse?: number
-  mae?: number
+  variance?: number
+  std_dev?: number
 } | null>(null)
 
 const depthValues = ref<{ left: number[]; right: number[] } | null>(null)
@@ -58,8 +58,7 @@ const checkFileAccessibility = async (url: string): Promise<boolean> => {
     const response = await api.head(url)
 
     return response.status === 200
-  }
-  catch (err) {
+  } catch (err) {
     console.error(`Error checking file accessibility for ${url}:`, err)
 
     return false
@@ -101,8 +100,7 @@ const handleSubmit = async () => {
       const mediaIndex = pointCloudUrl.indexOf('media/')
       if (mediaIndex !== -1) {
         pointCloudUrl = pointCloudUrl.substring(mediaIndex)
-      }
-      else {
+      } else {
         console.error('Could not find media/ in path:', pointCloudUrl)
         error.value = 'Invalid file path returned by server'
 
@@ -116,22 +114,18 @@ const handleSubmit = async () => {
     const isPointCloudAccessible = await checkFileAccessibility(pointCloudUrl)
 
     if (!isPointCloudAccessible) {
-      const predictedUrl = pointCloudUrl.endsWith('_predicted.ply')
-        ? pointCloudUrl
-        : `${pointCloudUrl}_predicted.ply`
+      const predictedUrl = pointCloudUrl.endsWith('_predicted.ply') ? pointCloudUrl : `${pointCloudUrl}_predicted.ply`
 
       const isPredictedAccessible = await checkFileAccessibility(predictedUrl)
 
       if (isPredictedAccessible) {
         predictionResult.value = predictedUrl
-      }
-      else {
+      } else {
         error.value = 'Point cloud file is not accessible. Please check server configuration.'
 
         return
       }
-    }
-    else {
+    } else {
       predictionResult.value = pointCloudUrl
     }
 
@@ -139,16 +133,14 @@ const handleSubmit = async () => {
       let leftUnetUrl = response.data.unet_outputs.left
       if (leftUnetUrl.match(/^[A-Z]:\\|^\/|^\\/i)) {
         const mediaIndex = leftUnetUrl.indexOf('media/')
-        if (mediaIndex !== -1)
-          leftUnetUrl = leftUnetUrl.substring(mediaIndex)
+        if (mediaIndex !== -1) leftUnetUrl = leftUnetUrl.substring(mediaIndex)
       }
       leftUnetUrl = `http://localhost:8000/${leftUnetUrl}`
 
       let rightUnetUrl = response.data.unet_outputs.right
       if (rightUnetUrl.match(/^[A-Z]:\\|^\/|^\\/i)) {
         const mediaIndex = rightUnetUrl.indexOf('media/')
-        if (mediaIndex !== -1)
-          rightUnetUrl = rightUnetUrl.substring(mediaIndex)
+        if (mediaIndex !== -1) rightUnetUrl = rightUnetUrl.substring(mediaIndex)
       }
       rightUnetUrl = `http://localhost:8000/${rightUnetUrl}`
 
@@ -169,26 +161,21 @@ const handleSubmit = async () => {
           right: response.data.depth_values.right,
         }
       }
-    }
-    else {
+    } else {
       console.log('No UNet outputs in response')
     }
 
-    if (response.data.metrics)
-      currentMetrics.value = response.data.metrics
-  }
-  catch (err) {
+    if (response.data.metrics) currentMetrics.value = response.data.metrics
+  } catch (err) {
     error.value = 'Error processing images. Please try again.'
     console.error('Prediction error:', err)
-  }
-  finally {
+  } finally {
     isLoading.value = false
   }
 }
 
 const downloadPointCloud = async () => {
-  if (!predictionResult.value)
-    return
+  if (!predictionResult.value) return
 
   try {
     const response = await api.get(predictionResult.value, {
@@ -204,8 +191,7 @@ const downloadPointCloud = async () => {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
-  }
-  catch (err) {
+  } catch (err) {
     console.error('Error downloading point cloud:', err)
     error.value = 'Error downloading point cloud'
   }
@@ -240,11 +226,7 @@ const handleMouseMove = (event: MouseEvent) => {
 
   const index = pixelY * depthWidth + pixelX
 
-  if (
-    pixelX >= 0 && pixelX < depthWidth &&
-    pixelY >= 0 && pixelY < depthHeight &&
-    index < depthArray.length
-  ) {
+  if (pixelX >= 0 && pixelX < depthWidth && pixelY >= 0 && pixelY < depthHeight && index < depthArray.length) {
     hoveredDepth.value = depthArray[index]
     tooltipX.value = x
     tooltipY.value = y
@@ -256,7 +238,7 @@ const handleMouseMove = (event: MouseEvent) => {
 
 const tooltipStyle = computed(() => ({
   top: `${tooltipY.value + 10}px`,
-  left: `${tooltipX.value + 10}px`
+  left: `${tooltipX.value + 10}px`,
 }))
 
 const handleMouseMoveRight = (event: MouseEvent) => {
@@ -276,11 +258,7 @@ const handleMouseMoveRight = (event: MouseEvent) => {
 
   const index = pixelY * depthWidth + pixelX
 
-  if (
-    pixelX >= 0 && pixelX < depthWidth &&
-    pixelY >= 0 && pixelY < depthHeight &&
-    index < depthArray.length
-  ) {
+  if (pixelX >= 0 && pixelX < depthWidth && pixelY >= 0 && pixelY < depthHeight && index < depthArray.length) {
     hoveredDepthRight.value = depthArray[index]
     tooltipXRight.value = x
     tooltipYRight.value = y
@@ -292,7 +270,7 @@ const handleMouseMoveRight = (event: MouseEvent) => {
 
 const tooltipStyleRight = computed(() => ({
   top: `${tooltipYRight.value + 10}px`,
-  left: `${tooltipXRight.value + 10}px`
+  left: `${tooltipXRight.value + 10}px`,
 }))
 </script>
 
@@ -310,7 +288,7 @@ const tooltipStyleRight = computed(() => ({
       </VBtn>
     </VCardTitle>
 
-    <VRow>
+    <VRow justify="center">
       <!-- Left Image Selection -->
       <VCol
         cols="12"
@@ -331,6 +309,7 @@ const tooltipStyleRight = computed(() => ({
               :src="leftPreview"
               cover
               class="mt-2"
+              style="max-height: 512px"
             />
           </VCardText>
         </VCard>
@@ -356,6 +335,7 @@ const tooltipStyleRight = computed(() => ({
               :src="rightPreview"
               cover
               class="mt-2"
+              style="max-height: 512px"
             />
           </VCardText>
         </VCard>
@@ -434,8 +414,15 @@ const tooltipStyleRight = computed(() => ({
                       @mouseleave="showDepth = false"
                       ref="leftImageContainer"
                     >
-                      <VImg :src="unetOutputs.left" cover />
-                      <div v-if="showDepth" class="depth-tooltip" :style="tooltipStyle">
+                      <VImg
+                        :src="unetOutputs.left"
+                        cover
+                      />
+                      <div
+                        v-if="showDepth"
+                        class="depth-tooltip"
+                        :style="tooltipStyle"
+                      >
                         Depth: {{ hoveredDepth?.toFixed(2) }}
                       </div>
                     </div>
@@ -455,8 +442,15 @@ const tooltipStyleRight = computed(() => ({
                       @mouseleave="showDepthRight = false"
                       ref="rightImageContainer"
                     >
-                      <VImg :src="unetOutputs.right" cover />
-                      <div v-if="showDepthRight" class="depth-tooltip" :style="tooltipStyleRight">
+                      <VImg
+                        :src="unetOutputs.right"
+                        cover
+                      />
+                      <div
+                        v-if="showDepthRight"
+                        class="depth-tooltip"
+                        :style="tooltipStyleRight"
+                      >
                         Depth: {{ hoveredDepthRight?.toFixed(2) }}
                       </div>
                     </div>
@@ -499,37 +493,15 @@ const tooltipStyleRight = computed(() => ({
               cols="12"
               class="text-center"
             >
-              <VBtn
-                color="primary"
-                variant="text"
-                size="small"
-                class="me-2"
-                @click="viewPointCloud(predictionResult)"
+              <VCardText
+                class="pa-0"
+                style="max-height: 500px"
               >
-                View Point Cloud
-              </VBtn>
-              <VDialog
-                v-model="dialog"
-                fullscreen
-              >
-                <VCard>
-                  <VCardTitle class="d-flex justify-space-between align-center">
-                    Point Cloud Viewer
-                    <VBtn
-                      icon
-                      @click="dialog = false"
-                    >
-                      <VIcon icon="ri-close-line" />
-                    </VBtn>
-                  </VCardTitle>
-                  <VCardText class="pa-0">
-                    <PointCloudViewer
-                      v-if="selectedFile"
-                      :file-path="selectedFile"
-                    />
-                  </VCardText>
-                </VCard>
-              </VDialog>
+                <PointCloudViewer
+                  v-if="predictionResult"
+                  :file-path="predictionResult"
+                />
+              </VCardText>
             </VCol>
           </VCardText>
         </VCard>

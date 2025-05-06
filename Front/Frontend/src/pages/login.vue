@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
 
+import logo from '@images/logo.svg?raw'
 import authV1MaskDark from '@images/pages/auth-v1-mask-dark.png'
 import authV1MaskLight from '@images/pages/auth-v1-mask-light.png'
 import authV1Tree2 from '@images/pages/auth-v1-tree-2.png'
@@ -16,9 +17,7 @@ const form = ref({
 const vuetifyTheme = useTheme()
 
 const authThemeMask = computed(() => {
-  return vuetifyTheme.global.name.value === 'light'
-    ? authV1MaskLight
-    : authV1MaskDark
+  return vuetifyTheme.global.name.value === 'light' ? authV1MaskLight : authV1MaskDark
 })
 
 const isPasswordVisible = ref(false)
@@ -32,8 +31,7 @@ const handleLogin = async () => {
   try {
     await authStore.login(form.value.email, form.value.password)
     router.push('/')
-  }
-  catch (error) {
+  } catch (error) {
     errorMessage.value = 'Invalid credentials'
   }
 }
@@ -48,18 +46,19 @@ const handleLogin = async () => {
       max-width="448"
     >
       <VCardItem class="justify-center">
-        <h2 class="font-weight-medium text-2xl text-uppercase">
-          Wound3D
-        </h2>
+        <div class="d-flex align-center gap-3">
+          <!-- eslint-disable vue/no-v-html -->
+          <div
+            class="d-flex"
+            v-html="logo"
+          />
+          <h2 class="font-weight-medium text-2xl text-uppercase">Wound3D</h2>
+        </div>
       </VCardItem>
 
       <VCardText class="pt-2">
-        <h4 class="text-h4 mb-1">
-          Welcome to Wound3D! 👋🏻
-        </h4>
-        <p class="mb-0">
-          Please sign-in to your account
-        </p>
+        <h4 class="text-h4 mb-1">Welcome to Wound3D! 👋🏻</h4>
+        <p class="mb-0">Please sign-in to your account</p>
       </VCardText>
 
       <VCardText>
@@ -155,5 +154,5 @@ const handleLogin = async () => {
 </template>
 
 <style lang="scss">
-@use "@core/scss/template/pages/page-auth";
+@use '@core/scss/template/pages/page-auth';
 </style>

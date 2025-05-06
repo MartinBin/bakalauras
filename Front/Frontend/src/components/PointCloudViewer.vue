@@ -17,8 +17,7 @@ let controls: OrbitControls
 onMounted(async () => {
   await nextTick()
 
-  if (!container.value)
-    return
+  if (!container.value) return
 
   const { clientWidth, clientHeight } = container.value
 
@@ -93,8 +92,7 @@ function renderScene() {
 }
 
 function onWindowResize() {
-  if (!container.value)
-    return
+  if (!container.value) return
   const { clientWidth, clientHeight } = container.value
 
   renderer.setSize(clientWidth, clientHeight)
@@ -112,8 +110,8 @@ function onWindowResize() {
 
 <style scoped>
 .viewer-container {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 </style>

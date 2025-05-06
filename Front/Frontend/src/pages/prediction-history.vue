@@ -20,7 +20,7 @@ const selectedFile = ref<string | undefined>()
 const predictions = ref<Prediction[]>([])
 
 onMounted(async () => {
-  const response = await api.get('/user/predictions/history')
+  const response = await api.get('/user/predictions/')
 
   predictions.value = response.data.map((item: any) => ({
     id: item.id,
@@ -37,7 +37,7 @@ const formatDate = (timestamp: number) => {
 }
 
 const viewPointCloud = (prediction: Prediction) => {
-  selectedFile.value = "http://localhost:8000"+prediction.predictedPointCloud
+  selectedFile.value = 'http://localhost:8000' + prediction.predictedPointCloud
   dialog.value = true
 }
 
@@ -114,9 +114,7 @@ const clearHistory = async () => {
                     <div>Variance: {{ prediction.metrics.variance.toFixed(4) }}</div>
                     <div>Standard deviation: {{ prediction.metrics.std_dev.toFixed(4) }}</div>
                   </div>
-                  <div v-else>
-                    No metrics available
-                  </div>
+                  <div v-else>No metrics available</div>
                 </td>
                 <td>
                   <VBtn

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.prediction.models.prediction_model import PredictionResult
+from api.prediction.models.prediction_models import PredictionResult
 
 class PredictionResultSerializer(serializers.Serializer):
     id = serializers.CharField(source='pk')

@@ -1,5 +1,9 @@
 from rest_framework import serializers
-from api.user.models.user_model import User
+from api.user.models.user_models import User
+
+class UserLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField()
 
 class UserRegistrationSerializer(serializers.Serializer):
     email = serializers.EmailField()

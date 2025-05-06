@@ -1,7 +1,7 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.settings import api_settings
-from api.user.models.user_model import User
+from api.user.models.user_models import User
 
 class MongoEngineJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):

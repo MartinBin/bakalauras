@@ -1,18 +1,22 @@
 import logging
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from api.user.serializers.user_serializer import UserSerializer
+from api.user.serializers.user_serializers import UserSerializer
 
 logger = logging.getLogger(__name__)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def user(request):
-    try:
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
-    except Exception as e:
-        logger.error(f"Error in user view: {str(e)}")
-        return Response({'error': 'Authentication failed'}, status=status.HTTP_401_UNAUTHORIZED)
+class UserView(RetrieveAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            return self.retrieve(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in user view: {str(e)}")
+            return Response({'error': 'Authentication failed'}, status=status.HTTP_401_UNAUTHORIZED)
