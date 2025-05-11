@@ -13,10 +13,6 @@ export const routes = [
         path: 'prediction-history',
         component: () => import('@/pages/prediction-history.vue'),
       },
-      {
-        path: 'account-settings',
-        component: () => import('@/pages/account-settings.vue'),
-      },
     ],
   },
   {

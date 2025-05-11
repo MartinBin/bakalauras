@@ -11,6 +11,7 @@ interface Prediction {
   metrics: {
     variance: number
     std_dev: number
+    depth_confidence?: number
   } | null
 }
 
@@ -113,6 +114,9 @@ const clearHistory = async () => {
                   <div v-if="prediction.metrics && prediction.metrics.variance != null">
                     <div>Variance: {{ prediction.metrics.variance.toFixed(4) }}</div>
                     <div>Standard deviation: {{ prediction.metrics.std_dev.toFixed(4) }}</div>
+                    <div v-if="prediction.metrics.depth_confidence">
+                      Depth Confidence: {{ (prediction.metrics.depth_confidence * 100).toFixed(1) }}%
+                    </div>
                   </div>
                   <div v-else>No metrics available</div>
                 </td>

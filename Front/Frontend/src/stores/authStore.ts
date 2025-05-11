@@ -14,8 +14,7 @@ export const useAuthStore = defineStore('auth', {
         await axios.post(`${API_URL}/login/`, { email, password }, { withCredentials: true })
 
         await this.fetchUser()
-      }
-      catch (error) {
+      } catch (error) {
         console.error('Login failed.', error)
         throw error
       }
@@ -28,27 +27,37 @@ export const useAuthStore = defineStore('auth', {
         })
 
         this.user = response.data
-      }
-      catch (error) {
-        console.error(error)
+        return response.data
+      } catch (error) {
+        this.user = null
+        console.error('Failed to fetch user:', error)
+        throw error
       }
     },
 
     async refreshTokenRequest() {
       try {
-        await axios.post(`${API_URL}/refresh/`, {}, {
-          withCredentials: true,
-        })
-      }
-      catch (error) {
+        await axios.post(
+          `${API_URL}/refresh/`,
+          {},
+          {
+            withCredentials: true,
+          },
+        )
+      } catch (error) {
         console.error('Failed to refresh token', error)
-        this.logout()
+        this.user = null
+        throw error
       }
     },
 
-    logout() {
+    async logout() {
       this.user = null
-      axios.post(`${API_URL}/logout/`, {}, { withCredentials: true }).catch(err => console.error(err))
+      try {
+        await axios.post(`${API_URL}/logout/`, {}, { withCredentials: true })
+      } catch (error) {
+        console.error('Logout failed:', error)
+      }
     },
   },
 })

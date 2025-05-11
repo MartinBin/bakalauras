@@ -56,9 +56,23 @@ def run_prediction(left_image, right_image):
         variance = np.var(point_cloud_np, axis=0)
         std_dev = np.std(point_cloud_np, axis=0)
         
+        logger.info("Starting getting unet outputs")
+        left_unet, right_unet, left_depth, right_depth = trainer.getUnetOutput(left_img, right_img)
+        
+        depth_confidence = 0.5
+        if left_depth is not None and right_depth is not None:
+            if torch.is_tensor(left_depth):
+                left_depth = left_depth.cpu().numpy()
+            if torch.is_tensor(right_depth):
+                right_depth = right_depth.cpu().numpy()
+                
+            depth_diff = np.abs(left_depth - right_depth)
+            depth_confidence = np.exp(-np.mean(depth_diff))
+        
         metrics = {
             'variance': float(np.mean(variance)),
             'std_dev': float(np.mean(std_dev)),
+            'depth_confidence': float(depth_confidence),
         }
         
         logger.info(f"Calculated metrics: {metrics}")
@@ -78,9 +92,6 @@ def run_prediction(left_image, right_image):
         visualization_path = None
         if visualization_success:
             visualization_path = os.path.join('media', 'point_clouds', 'visualizations', f'sample_0_overlay.png')
-        
-        logger.info("Starting getting unet outputs")
-        left_unet, right_unet, left_depth, right_depth = trainer.getUnetOutput(left_img, right_img)
         
         unet_output_paths = {}
         depth_values = {}

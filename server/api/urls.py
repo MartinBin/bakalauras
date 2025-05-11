@@ -8,13 +8,13 @@ router = DefaultRouter()
 router.register(r'prediction-results', PredictionResultViewSet, basename='prediction-result')
 
 urlpatterns = [
-    path('auth/registration/', RegisterView.as_view()),
-    path('auth/login/', LoginView.as_view()),
-    path('auth/logout/', LogoutView.as_view()),
-    path('auth/refresh/', RefreshTokenView.as_view()),
-    path('auth/user/', UserView.as_view()),
-    path('predict/', PredictionView.as_view()),
-    path('user/predictions/', UserPredictionsView.as_view()),
-    path('user/predictions/<str:prediction_id>/', UserPredictionDetailView.as_view),
+    path('auth/registration/', RegisterView.as_view(), name='registration'),
+    path('auth/login/', LoginView.as_view(), name='login'),
+    path('auth/logout/', LogoutView.as_view(), name='logout'),
+    path('auth/refresh/', RefreshTokenView.as_view(), name='refresh'),
+    path('auth/user/', UserView.as_view(), name='user'),
+    path('predict/', PredictionView.as_view(), name='predict'),
+    path('user/predictions/', UserPredictionsView.as_view(), name='user-predictions'),
+    path('user/predictions/<str:prediction_id>/', UserPredictionDetailView.as_view(), name='user-prediction-detail'),
     path('', include(router.urls)),
 ]

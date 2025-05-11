@@ -10,16 +10,21 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-  if (to.meta.requiresAuth && !authStore.user) {
+
+  if (to.meta.requiresAuth) {
     try {
-      authStore.fetchUser()
-      next()
+      await authStore.fetchUser()
+      if (authStore.user) {
+        next()
+      } else {
+        next({ path: '/login', replace: true })
+      }
+    } catch (err) {
+      next({ path: '/login', replace: true })
     }
-    catch (err) {
-      next('/login')
-    }
+  } else {
+    next()
   }
-  else { next() }
 })
 
 export default function (app: App) {

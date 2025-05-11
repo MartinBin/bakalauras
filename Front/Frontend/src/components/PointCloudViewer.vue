@@ -29,9 +29,18 @@ onMounted(async () => {
   camera.position.set(0, 0, 5)
 
   renderer = new THREE.WebGLRenderer()
-  renderer.setSize(window.innerWidth, window.innerHeight)
+  renderer.setSize(clientWidth, clientHeight)
   renderer.setPixelRatio(window.devicePixelRatio)
   container.value.appendChild(renderer.domElement)
+
+  const resizeObserver = new ResizeObserver(() => {
+    if (!container.value) return
+    const { clientWidth, clientHeight } = container.value
+    renderer.setSize(clientWidth, clientHeight)
+    camera.aspect = clientWidth / clientHeight
+    camera.updateProjectionMatrix()
+  })
+  resizeObserver.observe(container.value)
 
   controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true

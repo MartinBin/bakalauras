@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
 import axios from 'axios'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 
 import logo from '@images/logo.svg?raw'
 import authV1MaskDark from '@images/pages/auth-v1-mask-dark.png'

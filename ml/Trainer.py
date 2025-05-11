@@ -600,6 +600,8 @@ class Trainer:
 
             self.__verbose("Starting decoder",level=1)
             predicted_point_cloud = self.decoder(fused_latent)
+            
+            self.predicted_point_cloud = predicted_point_cloud.detach()
 
             if torch.isnan(predicted_point_cloud).any():
                 self.__verbose("Warning: NaN detected in decoder output", level=2)
@@ -640,15 +642,15 @@ class Trainer:
                     self.__verbose(f"Traceback: {traceback.format_exc()}", level=2)
                     return predicted_point_cloud, None
                 
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                pred_filename = f"{save_path}_predicted.ply"
-                target_filename = f"{save_path}_target.ply"
+                #os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                #pred_filename = f"{save_path}_predicted.ply"
+                #target_filename = f"{save_path}_target.ply"
                 
-                self.save_point_cloud_as_ply(predicted_point_cloud, pred_filename)
-                self.save_point_cloud_as_ply(target_point_cloud, target_filename)
+                #self.save_point_cloud_as_ply(predicted_point_cloud, pred_filename)
+                #self.save_point_cloud_as_ply(target_point_cloud, target_filename)
                 
-                self.__verbose(f"Saved predicted point cloud to {pred_filename}", level=1)
-                self.__verbose(f"Saved target point cloud to {target_filename}", level=1)
+                #self.__verbose(f"Saved predicted point cloud to {pred_filename}", level=1)
+                #self.__verbose(f"Saved target point cloud to {target_filename}", level=1)
                 
                 return predicted_point_cloud, {
                     'mse': mse_loss.item(),
@@ -656,10 +658,10 @@ class Trainer:
                     'chamfer': chamfer_dist.item(),
                 }
             else:
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                output_filename = f"{save_path}_predicted.ply"
-                self.save_point_cloud_as_ply(predicted_point_cloud, output_filename)
-                self.__verbose(f"Saved predicted point cloud to {output_filename}", level=1)
+                #os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                #output_filename = f"{save_path}_predicted.ply"
+                #self.save_point_cloud_as_ply(predicted_point_cloud, output_filename)
+                #self.__verbose(f"Saved predicted point cloud to {output_filename}", level=1)
                 
                 return predicted_point_cloud, None
 
@@ -690,7 +692,7 @@ class Trainer:
             if hasattr(self, 'dataloader') and self.dataloader is not None and hasattr(self.dataloader.dataset, 'normalization_params'):
                 params = self.dataloader.dataset.normalization_params
 
-                points_np = points_np * params['scale'].cpu().numpy() + params['center'].cpu().numpy()
+                points_np = points_np * params['scale'].detach().cpu().numpy() + params['center'].detach().cpu().numpy()
                 self.__verbose("Point cloud denormalized using stored parameters", level=2)
             else:
                 points_np = points_np * 2.0 - 1.0
@@ -744,3 +746,6 @@ class Trainer:
                 left_output = self.unet(left_images)
                 right_output = self.unet(right_images)
                 return left_output, right_output, left_output, right_output
+            
+    def get_predicted_point_cloud(self):
+        return self.predicted_point_cloud

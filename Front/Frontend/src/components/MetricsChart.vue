@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Bar } from 'vue-chartjs'
-import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Title, Tooltip } from 'chart.js'
+import { Bar, Doughnut } from 'vue-chartjs'
+import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Title, Tooltip, ArcElement } from 'chart.js'
 
 const props = defineProps<{
   metrics: {
     variance?: number
     std_dev?: number
+    depth_confidence?: number
   }
 }>()
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement)
 
 const chartData = computed(() => {
   if (!props.metrics) return null
@@ -56,30 +57,73 @@ const chartOptions = {
     },
   },
 }
+
+const confidenceOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'bottom' as const,
+    },
+    title: {
+      display: true,
+      text: 'Confidence Components',
+    },
+  },
+}
 </script>
 
 <template>
-  <VCard class="metrics-chart pa-4">
-    <VCardTitle>Prediction Metrics</VCardTitle>
-    <VCardText>
-      <div class="chart-container">
-        <Bar
-          v-if="chartData"
-          :data="chartData"
-          :options="chartOptions"
-        />
-      </div>
-    </VCardText>
-  </VCard>
+  <div class="metrics-container">
+    <VCard class="metrics-chart pa-4">
+      <VCardTitle>Prediction Metrics</VCardTitle>
+      <VCardText>
+        <div class="chart-container">
+          <Bar
+            v-if="chartData"
+            :data="chartData"
+            :options="chartOptions"
+          />
+        </div>
+      </VCardText>
+    </VCard>
+  </div>
 </template>
 
 <style scoped>
-.metrics-chart {
+.metrics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.metrics-chart,
+.confidence-chart {
   height: 100%;
 }
 
 .chart-container {
   height: 300px;
   position: relative;
+}
+
+.charts-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.charts-row .chart-container {
+  flex: 1;
+}
+
+.confidence-score {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  font-weight: bold;
+  color: #4bc0c0;
 }
 </style>

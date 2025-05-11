@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'dj_rest_auth.registration',
     'api',
+    'django_nose',
 ]
 
 MIDDLEWARE = [
@@ -110,6 +111,8 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
+CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -212,23 +215,33 @@ MONGODB_DATABASES = {
         'name': 'bakis_db',
         'host': 'localhost',
         'port': 27017,
+    },
+    'test': {
+        'name': 'bakis_test_db',
+        'host': 'localhost',
+        'port': 27017,
     }
 }
 
-
-# CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
-CORS_ALLOW_CREDENTIALS = True
-
-# Connect to MongoDB
-mongoengine.connect(
-    db='bakalauras',
-    host='localhost',
-    port=27017,
-    username='',  # Add if authentication is required
-    password='',  # Add if authentication is required
-    authentication_source='admin'  # Add if authentication is required
-)
+import sys
+if 'test' in sys.argv:
+    mongoengine.connect(
+        db='bakis_test_db',
+        host='localhost',
+        port=27017,
+        username='',
+        password='',
+        authentication_source='admin'
+    )
+else:
+    mongoengine.connect(
+        db='bakalauras',
+        host='localhost',
+        port=27017,
+        username='',
+        password='',
+        authentication_source='admin'
+    )
 
 # Logging Configuration
 LOGGING = {

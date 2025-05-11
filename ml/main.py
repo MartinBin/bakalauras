@@ -7,26 +7,15 @@ from Trainer import Trainer
 import argparse
 import sys
 import torch
+import csv
+import os
+from datetime import datetime
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
 
 
 def create_train_val_dataloaders(dataset, batch_size=6, val_split=0.2, seed=42, num_workers=0):
-    """
-    Split a dataset into training and validation sets and create dataloaders.
-    
-    This function takes a dataset and splits it into training and validation sets
-    based on the specified validation split ratio. It then creates DataLoader objects
-    for each set with the specified batch size and number of workers.
-    
-    Args:
-        dataset: The dataset to split
-        batch_size (int, optional): Batch size for the dataloaders. Defaults to 6.
-        val_split (float, optional): Fraction of the dataset to use for validation (0.0 to 1.0). Defaults to 0.2.
-        seed (int, optional): Random seed for reproducibility. Defaults to 42.
-        num_workers (int, optional): Number of worker processes for data loading. Defaults to 0.
-        
-    Returns:
-        tuple: (train_dataloader, val_dataloader) - DataLoader objects for training and validation
-    """
     torch.manual_seed(seed)
     
     total_size = len(dataset)
@@ -56,6 +45,147 @@ def create_train_val_dataloaders(dataset, batch_size=6, val_split=0.2, seed=42, 
     )
     
     return train_dataloader, val_dataloader
+
+
+def calculate_additional_metrics(pred_point_cloud, target_point_cloud):
+    if torch.is_tensor(pred_point_cloud):
+        pred_np = pred_point_cloud.detach().cpu().numpy()
+    else:
+        pred_np = pred_point_cloud
+        
+    if torch.is_tensor(target_point_cloud):
+        target_np = target_point_cloud.detach().cpu().numpy()
+    else:
+        target_np = target_point_cloud
+    
+    if pred_np.ndim > 2:
+        pred_np = pred_np.reshape(-1, 3)
+    if target_np.ndim > 2:
+        target_np = target_np.reshape(-1, 3)
+    
+    pred_range = np.max(pred_np, axis=0) - np.min(pred_np, axis=0)
+    target_range = np.max(target_np, axis=0) - np.min(target_np, axis=0)
+    
+    epsilon = 1e-06
+    pred_range = np.where(pred_range < epsilon, epsilon, pred_range)
+    target_range = np.where(target_range < epsilon, epsilon, target_range)
+    
+    pred_volume = np.prod(pred_range)
+    target_volume = np.prod(target_range)
+    
+    pred_volume = max(pred_volume, epsilon)
+    target_volume = max(target_volume, epsilon)
+    
+    pred_density = float(len(pred_np)) / float(pred_volume)
+    target_density = float(len(target_np)) / float(target_volume)
+    
+    density_ratio = pred_density / target_density if target_density > 0 else 0
+    volume_ratio = pred_volume / target_volume if target_volume > 0 else 0
+    
+    try:
+        pred_hist, _ = np.histogramdd(pred_np, bins=10)
+        target_hist, _ = np.histogramdd(target_np, bins=10)
+        correlation, _ = pearsonr(pred_hist.flatten(), target_hist.flatten())
+    except Exception as e:
+        print(f"Warning: Could not calculate histogram correlation: {e}")
+        correlation = 0
+    
+    return {
+        'density_ratio': float(density_ratio),
+        'volume_ratio': float(volume_ratio),
+        'distribution_correlation': float(correlation)
+    }
+
+
+def plot_metrics_distribution(metrics_list, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+    
+    mse_values = [m['mse'] for m in metrics_list]
+    mae_values = [m['mae'] for m in metrics_list]
+    chamfer_values = [m['chamfer'] for m in metrics_list]
+    density_ratios = [m['density_ratio'] for m in metrics_list]
+    volume_ratios = [m['volume_ratio'] for m in metrics_list]
+    correlations = [m['distribution_correlation'] for m in metrics_list]
+    
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    fig.suptitle('Distribution of Prediction Metrics')
+    
+    axes[0, 0].hist(mse_values, bins=20)
+    axes[0, 0].set_title('MSE Distribution')
+    axes[0, 0].set_xlabel('MSE')
+    axes[0, 0].set_ylabel('Frequency')
+    
+    axes[0, 1].hist(mae_values, bins=20)
+    axes[0, 1].set_title('MAE Distribution')
+    axes[0, 1].set_xlabel('MAE')
+    
+    axes[0, 2].hist(chamfer_values, bins=20)
+    axes[0, 2].set_title('Chamfer Distance Distribution')
+    axes[0, 2].set_xlabel('Chamfer Distance')
+    
+    axes[1, 0].hist(density_ratios, bins=20)
+    axes[1, 0].set_title('Point Density Ratio Distribution')
+    axes[1, 0].set_xlabel('Density Ratio')
+    axes[1, 0].set_ylabel('Frequency')
+    
+    axes[1, 1].hist(volume_ratios, bins=20)
+    axes[1, 1].set_title('Volume Ratio Distribution')
+    axes[1, 1].set_xlabel('Volume Ratio')
+    
+    axes[1, 2].hist(correlations, bins=20)
+    axes[1, 2].set_title('Distribution Correlation')
+    axes[1, 2].set_xlabel('Correlation')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'metrics_distribution.png'))
+    plt.close()
+
+
+def save_metrics_to_csv(metrics_list, output_file):
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"{output_file}_{timestamp}.csv"
+    
+    fieldnames = [
+        'sample_id', 'mse', 'mae', 'chamfer_distance',
+        'density_ratio', 'volume_ratio', 'distribution_correlation'
+    ]
+    
+    with open(filename, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        for i, metrics in enumerate(metrics_list):
+            row = {
+                'sample_id': i,
+                'mse': metrics['mse'],
+                'mae': metrics['mae'],
+                'chamfer_distance': metrics['chamfer'],
+                'density_ratio': metrics['density_ratio'],
+                'volume_ratio': metrics['volume_ratio'],
+                'distribution_correlation': metrics['distribution_correlation']
+            }
+            writer.writerow(row)
+        
+        avg_metrics = {
+            'sample_id': 'AVERAGE',
+            'mse': np.mean([m['mse'] for m in metrics_list]),
+            'mae': np.mean([m['mae'] for m in metrics_list]),
+            'chamfer_distance': np.mean([m['chamfer'] for m in metrics_list]),
+            'density_ratio': np.mean([m['density_ratio'] for m in metrics_list]),
+            'volume_ratio': np.mean([m['volume_ratio'] for m in metrics_list]),
+            'distribution_correlation': np.mean([m['distribution_correlation'] for m in metrics_list])
+        }
+        writer.writerow(avg_metrics)
+    
+    print(f"\nMetrics saved to: {filename}")
+    print("\nAverage Metrics:")
+    for key, value in avg_metrics.items():
+        if key != 'sample_id':
+            print(f"{key}: {value:.6f}")
+    
+    plot_metrics_distribution(metrics_list, os.path.dirname(output_file))
 
 
 def main(args):
@@ -130,18 +260,27 @@ def main(args):
             total_chamfer = 0
             num_samples = 0
             model.load_model()
+            
+            all_metrics = []
 
             for i, data in enumerate(train_dataloader, 0):
-                left_images, right_images, target_point_cloud = data
+                left_images, left_depths, right_images, right_depths, target_point_cloud = data
                 
-                metrics = model.predict(
+                predicted_point_cloud, metrics = model.predict(
                     left_image=left_images, 
                     right_image=right_images,
                     target_point_cloud=target_point_cloud,
                     save_path=f"./predictions/sample_{i}"
                 )
                 
-                if metrics:
+                if predicted_point_cloud is not None and metrics is not None:
+                    additional_metrics = calculate_additional_metrics(
+                        predicted_point_cloud,
+                        target_point_cloud
+                    )
+                    metrics.update(additional_metrics)
+                    
+                    all_metrics.append(metrics)
                     total_mse += metrics['mse']
                     total_mae += metrics['mae']
                     total_chamfer += metrics['chamfer']
@@ -151,14 +290,17 @@ def main(args):
                     print(f"MSE Loss: {metrics['mse']:.6f}")
                     print(f"MAE Loss: {metrics['mae']:.6f}")
                     print(f"Chamfer Distance: {metrics['chamfer']:.6f}")
-                
-                input("Press Enter to continue to next sample...")
+                    print(f"Point Density Ratio: {metrics['density_ratio']:.6f}")
+                    print(f"Volume Ratio: {metrics['volume_ratio']:.6f}")
+                    print(f"Distribution Correlation: {metrics['distribution_correlation']:.6f}")
             
             if num_samples > 0:
                 print("\nAverage Metrics Across All Samples:")
                 print(f"Average MSE Loss: {total_mse / num_samples:.6f}")
                 print(f"Average MAE Loss: {total_mae / num_samples:.6f}")
                 print(f"Average Chamfer Distance: {total_chamfer / num_samples:.6f}")
+                
+                save_metrics_to_csv(all_metrics, "./metrics/prediction_metrics")
             
         except Exception as e:
             print(f"Error during prediction: {e}")

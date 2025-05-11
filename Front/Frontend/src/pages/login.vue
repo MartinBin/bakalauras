@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
+import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
 
 import logo from '@images/logo.svg?raw'
 import authV1MaskDark from '@images/pages/auth-v1-mask-dark.png'
@@ -11,7 +13,6 @@ import { useAuthStore } from '@/stores/authStore'
 const form = ref({
   email: '',
   password: '',
-  remember: false,
 })
 
 const vuetifyTheme = useTheme()
@@ -93,11 +94,6 @@ const handleLogin = async () => {
               </p>
               <!-- remember me checkbox -->
               <div class="d-flex align-center justify-space-between flex-wrap my-6">
-                <VCheckbox
-                  v-model="form.remember"
-                  label="Remember me"
-                />
-
                 <a
                   class="text-primary"
                   href="javascript:void(0)"

@@ -82,6 +82,14 @@ class PredictionResultViewSet(viewsets.ModelViewSet):
 class UserPredictionDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request, prediction_id):
+        try:
+            prediction = PredictionResult.objects.get(id=prediction_id, user=request.user)
+            serializer = PredictionResultSerializer(prediction)
+            return Response(serializer.data)
+        except PredictionResult.DoesNotExist:
+            return Response({'error': 'Prediction not found'}, status=404)
+
     def delete(self, request, prediction_id):
         try:
             prediction = PredictionResult.objects.get(id=prediction_id, user=request.user)
@@ -113,7 +121,7 @@ class UserPredictionsView(APIView):
         try:
             predictions = PredictionResult.objects.filter(user=request.user)
 
-            if not predictions.exists():
+            if predictions.count() == 0:
                 return Response({'message': 'No predictions found for this user.'}, status=404)
 
             file_paths = []

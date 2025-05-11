@@ -124,3 +124,4 @@ wheel==0.45.1
 widgetsnbextension==4.0.13
 yarg==0.1.9
 zipp==3.21.0
+coverage==7.4.3

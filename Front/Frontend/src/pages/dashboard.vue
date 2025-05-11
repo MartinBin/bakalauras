@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../utils/axiosSetup'
 import MetricsChart from '@/components/MetricsChart.vue'
@@ -33,6 +33,7 @@ const tooltipYRight = ref(0)
 const currentMetrics = ref<{
   variance?: number
   std_dev?: number
+  depth_confidence?: number
 } | null>(null)
 
 const depthValues = ref<{ left: number[]; right: number[] } | null>(null)
@@ -374,9 +375,35 @@ const tooltipStyleRight = computed(() => ({
       <VCol
         v-if="currentMetrics"
         cols="12"
-        md="4"
+        md="6"
       >
         <MetricsChart :metrics="currentMetrics" />
+      </VCol>
+
+      <!-- Confidence Score Card -->
+      <VCol
+        v-if="currentMetrics?.depth_confidence"
+        cols="12"
+        md="6"
+      >
+        <VCard class="pa-4">
+          <VCardTitle>Depth Prediction Confidence</VCardTitle>
+          <VCardText>
+            <div class="d-flex align-center justify-center">
+              <div class="confidence-circle">{{ (currentMetrics.depth_confidence * 100).toFixed(1) }}%</div>
+            </div>
+            <div class="mt-4">
+              <div class="d-flex justify-space-between">
+                <span>Depth Confidence:</span>
+                <span
+                  >{{
+                    currentMetrics.depth_confidence ? (currentMetrics.depth_confidence * 100).toFixed(1) : 'N/A'
+                  }}%</span
+                >
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
       </VCol>
 
       <!-- UNet Outputs Toggle -->
@@ -493,13 +520,11 @@ const tooltipStyleRight = computed(() => ({
               cols="12"
               class="text-center"
             >
-              <VCardText
-                class="pa-0"
-                style="max-height: 500px"
-              >
+              <VCardText class="pa-0">
                 <PointCloudViewer
                   v-if="predictionResult"
                   :file-path="predictionResult"
+                  class="point-cloud-container"
                 />
               </VCardText>
             </VCol>
@@ -538,5 +563,24 @@ const tooltipStyleRight = computed(() => ({
   font-size: 14px;
   pointer-events: none;
   z-index: 10;
+}
+
+.confidence-circle {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4bc0c0 0%, #2e8b8b 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: bold;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.point-cloud-container {
+  height: 600px;
+  width: 100%;
 }
 </style>

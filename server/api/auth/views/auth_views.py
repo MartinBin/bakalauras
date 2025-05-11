@@ -94,17 +94,17 @@ class RefreshTokenView(APIView):
             user = User.objects.get(id=user_id)
 
             access_token = token.access_token
-            refresh_token = token
+            new_refresh_token = RefreshToken.for_user(user)
 
             token_record.delete()
 
-            UserRefreshToken.objects.create(user=user, token=str(token))
+            UserRefreshToken.objects.create(user=user, token=str(new_refresh_token))
 
             response = Response({'message': 'Token refreshed'})
 
             response.set_cookie(
                 key='accessToken',
-                value=access_token,
+                value=str(access_token),
                 httponly=True,
                 secure=False,
                 samesite='Lax',
@@ -112,7 +112,7 @@ class RefreshTokenView(APIView):
             )
             response.set_cookie(
                 key='refreshToken',
-                value=refresh_token,
+                value=str(new_refresh_token),
                 httponly=True,
                 secure=False,
                 samesite='Lax',
