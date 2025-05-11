@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import api from '../utils/axiosSetup'
 
 interface Prediction {
@@ -19,6 +19,14 @@ const dialog = ref(false)
 const selectedFile = ref<string | undefined>()
 
 const predictions = ref<Prediction[]>([])
+const currentPage = ref(1)
+const itemsPerPage = 5
+
+const paginatedPredictions = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return predictions.value.slice(start, end)
+})
 
 onMounted(async () => {
   const response = await api.get('/user/predictions/')
@@ -31,6 +39,8 @@ onMounted(async () => {
     predictedPointCloud: item.point_cloud_path ? `/${item.point_cloud_path.replace(/\\/g, '/')}` : '',
     metrics: item.metrics || null,
   }))
+
+  predictions.value.sort((a, b) => b.timestamp - a.timestamp)
 })
 
 const formatDate = (timestamp: number) => {
@@ -88,7 +98,7 @@ const clearHistory = async () => {
             </thead>
             <tbody>
               <tr
-                v-for="prediction in predictions"
+                v-for="prediction in paginatedPredictions"
                 :key="prediction.id"
               >
                 <td>{{ formatDate(prediction.timestamp) }}</td>
@@ -165,6 +175,12 @@ const clearHistory = async () => {
               </tr>
             </tbody>
           </VTable>
+          <VPagination
+            v-if="predictions.length > 0"
+            v-model="currentPage"
+            :length="Math.ceil(predictions.length / itemsPerPage)"
+            class="mt-4"
+          />
           <VAlert
             v-else
             type="info"
