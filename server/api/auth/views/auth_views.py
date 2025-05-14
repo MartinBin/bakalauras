@@ -134,28 +134,28 @@ class RegisterView(APIView):
         logger.info(f"Registration attempt with data: {request.data}")
         serializer = UserRegistrationSerializer(data=request.data)
         
-        if serializer.is_valid():
-            try:
-                logger.info("Registration data is valid, creating user")
-                user = serializer.save()
-                logger.info(f"User created successfully: {user.username}")
-                refresh = RefreshToken.for_user(user)
-                logger.info("Refresh token generated")
-                
-                return Response({
-                    'user': {
-                        'id': str(user.id),
-                        'email': user.email,
-                        'username': user.username
-                    },
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                }, status=status.HTTP_201_CREATED)
-            except Exception as e:
-                logger.error(f"Error during user creation: {str(e)}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                return Response({'error': f'Error creating user: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        logger.error(f"Validation errors: {serializer.errors}")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if not serializer.is_valid():
+            logger.error(f"Validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            logger.info("Registration data is valid, creating user")
+            user = serializer.save()
+            logger.info(f"User created successfully: {user.username}")
+            refresh = RefreshToken.for_user(user)
+            logger.info("Refresh token generated")
+            
+            return Response({
+                'user': {
+                    'id': str(user.id),
+                    'email': user.email,
+                    'username': user.username
+                },
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.error(f"Error during user creation: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return Response({'error': f'Error creating user: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

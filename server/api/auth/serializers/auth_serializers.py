@@ -1,42 +1,41 @@
 from rest_framework import serializers
 from api.user.models.user_models import User
+import re
 
 class UserLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
 
 class UserRegistrationSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+    email = serializers.EmailField(required=True)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
 
-    def validate(self, data_to_validate):
-        password = data_to_validate.get('password')
-        email = data_to_validate.get('email')
-        username = data_to_validate.get('username')
+    def validate_email(self, value):
+        try:
+            if User.objects.get(email__iexact=value):
+                raise serializers.ValidationError("Email is already in use.")
+        except User.DoesNotExist:
+            pass
+        return value
 
-        errors = {}
+    def validate_username(self, value):
+        try:
+            if User.objects.get(username__iexact=value):
+                raise serializers.ValidationError("Username is already taken.")
+        except User.DoesNotExist:
+            pass
+        return value
 
-        if len(password) < 8:
-            errors['password'] = "Password must be at least 8 characters long."
-        
-        if not any(char.isdigit() for char in password):
-            errors['password'] = "Password must contain at least one digit."
-        
-        if not any(char.isalpha() for char in password):
-            errors['password'] = "Password must contain at least one letter."
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        if not any(char.isdigit() for char in value):
+            raise serializers.ValidationError("Password must contain at least one digit.")
+        if not any(char.isalpha() for char in value):
+            raise serializers.ValidationError("Password must contain at least one letter.")
+        return value
 
-        if User.objects(email__iexact=email).count() > 0:
-            errors['email'] = "Email is already in use."
-
-        if User.objects(username__iexact=username).count() > 0:
-            errors['username'] = "Username is already taken."
-
-        if errors:
-            raise serializers.ValidationError(errors)
-
-        return data_to_validate
-    
     def create(self, validated_data):
         user = User(
             email=validated_data['email'],

@@ -81,8 +81,7 @@ const register = async () => {
       </VCardItem>
 
       <VCardText class="pt-2">
-        <h4 class="text-h4 mb-1">Adventure starts here 🚀</h4>
-        <p class="mb-0">Make your app management easy and fun!</p>
+        <h4 class="text-h4 mb-1">Register</h4>
       </VCardText>
 
       <VCardText>

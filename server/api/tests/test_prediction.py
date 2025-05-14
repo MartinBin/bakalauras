@@ -53,3 +53,57 @@ class PredictionTests(BaseMongoTestCase):
         self.client.force_authenticate(user=None)
         response = self.client.delete('/api/user/predictions/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_delete_all_user_predictions(self):
+        """Test deleting all predictions for authenticated user"""
+        PredictionResult.objects.create(
+            user=self.user,
+            point_cloud_path='test/path/point_cloud.ply',
+            left_unet_path='test/path/left_unet.png',
+            right_unet_path='test/path/right_unet.png',
+            metadata={
+                'left_image_path': 'test/path/left.png',
+                'right_image_path': 'test/path/right.png'
+            },
+            metrics={'score': 0.85}
+        )
+        
+        response = self.client.delete('/api/user/predictions/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(PredictionResult.objects.count(), 0)
+
+    def test_delete_specific_prediction(self):
+        """Test deleting a specific prediction"""
+        prediction = PredictionResult.objects.create(
+            user=self.user,
+            point_cloud_path='test/path/point_cloud.ply',
+            left_unet_path='test/path/left_unet.png',
+            right_unet_path='test/path/right_unet.png',
+            metadata={
+                'left_image_path': 'test/path/left.png',
+                'right_image_path': 'test/path/right.png'
+            },
+            metrics={'score': 0.85}
+        )
+        
+        response = self.client.delete(f'/api/user/predictions/{prediction.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(PredictionResult.objects.count(), 0)
+
+    def test_delete_specific_prediction_unauthorized(self):
+        """Test deleting a specific prediction without authentication"""
+        prediction = PredictionResult.objects.create(
+            user=self.user,
+            point_cloud_path='test/path/point_cloud.ply',
+            left_unet_path='test/path/left_unet.png',
+            right_unet_path='test/path/right_unet.png',
+            metadata={
+                'left_image_path': 'test/path/left.png',
+                'right_image_path': 'test/path/right.png'
+            },
+            metrics={'score': 0.85}
+        )
+        
+        self.client.force_authenticate(user=None)
+        response = self.client.delete(f'/api/user/predictions/{prediction.id}/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

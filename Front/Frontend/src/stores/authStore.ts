@@ -31,7 +31,6 @@ export const useAuthStore = defineStore('auth', {
       } catch (error) {
         this.user = null
         console.error('Failed to fetch user:', error)
-        throw error
       }
     },
 
@@ -47,7 +46,7 @@ export const useAuthStore = defineStore('auth', {
       } catch (error) {
         console.error('Failed to refresh token', error)
         this.user = null
-        throw error
+        await this.logout()
       }
     },
 

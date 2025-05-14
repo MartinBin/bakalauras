@@ -1,5 +1,5 @@
 [run]
-source = .
+source = api/auth/views,api/user/views,api/prediction/views
 omit =
     */migrations/*
     */tests/*

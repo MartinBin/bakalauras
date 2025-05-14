@@ -92,17 +92,10 @@ const handleLogin = async () => {
               >
                 {{ errorMessage }}
               </p>
-              <!-- remember me checkbox -->
-              <div class="d-flex align-center justify-space-between flex-wrap my-6">
-                <a
-                  class="text-primary"
-                  href="javascript:void(0)"
-                >
-                  Forgot Password?
-                </a>
-              </div>
+            </VCol>
 
-              <!-- login button -->
+            <!-- login button -->
+            <VCol cols="12">
               <VBtn
                 block
                 type="submit"

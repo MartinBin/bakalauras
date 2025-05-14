@@ -15,8 +15,6 @@ const predictionResult = ref<string>('')
 const unetOutputs = ref<{ left: string; right: string } | null>(null)
 const showUnetOutputs = ref(false)
 const viewerError = ref(false)
-const dialog = ref(false)
-const selectedFile = ref<string | undefined>()
 
 const showDepth = ref(false)
 const hoveredDepth = ref<number | null>(null)
@@ -31,8 +29,6 @@ const tooltipXRight = ref(0)
 const tooltipYRight = ref(0)
 
 const currentMetrics = ref<{
-  variance?: number
-  std_dev?: number
   depth_confidence?: number
 } | null>(null)
 
@@ -202,11 +198,6 @@ const viewHistory = () => {
   router.push('/prediction-history')
 }
 
-const viewPointCloud = (predictionResult: string) => {
-  selectedFile.value = predictionResult
-  dialog.value = true
-}
-
 const depthWidth = 512
 const depthHeight = 512
 
@@ -370,16 +361,6 @@ const tooltipStyleRight = computed(() => ({
           {{ error }}
         </VAlert>
       </VCol>
-
-      <!-- Metrics Chart -->
-      <VCol
-        v-if="currentMetrics"
-        cols="12"
-        md="6"
-      >
-        <MetricsChart :metrics="currentMetrics" />
-      </VCol>
-
       <!-- Confidence Score Card -->
       <VCol
         v-if="currentMetrics?.depth_confidence"

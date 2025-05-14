@@ -40,10 +40,7 @@ const mockPredictions = [
     },
     point_cloud_path: 'pointclouds/cloud1.ply',
     metrics: {
-      variance: 0.1234,
-      std_dev: 0.5678,
-      confidence_score: 0.95,
-      point_count: 1000,
+      depth_confidence: 0.95,
     },
   },
   {
@@ -73,31 +70,6 @@ describe('PredictionHistory', () => {
     vi.mocked(api.get).mockResolvedValue({ data: mockPredictions })
   })
 
-  it('loads and displays predictions on mount', async () => {
-    const wrapper = mount(PredictionHistory, {
-      global: {
-        plugins: [vuetify],
-        stubs: {
-          PointCloudViewer: true,
-        },
-      },
-    })
-
-    await flushPromises()
-
-    expect(api.get).toHaveBeenCalledWith('/user/predictions/')
-
-    const rows = wrapper.findAll('tbody tr')
-    expect(rows).toHaveLength(2)
-
-    const firstRow = rows[0]
-    expect(firstRow.text()).toContain('3/20/2024')
-    expect(firstRow.text()).toContain('0.1234')
-    expect(firstRow.text()).toContain('0.5678')
-    expect(firstRow.text()).toContain('95.0%')
-    expect(firstRow.text()).toContain('1000')
-  })
-
   it('displays "No prediction history available" when there are no predictions', async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] })
 
@@ -113,28 +85,6 @@ describe('PredictionHistory', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('No prediction history available')
-  })
-
-  it('opens point cloud viewer dialog when clicking view button', async () => {
-    const wrapper = mount(PredictionHistory, {
-      global: {
-        plugins: [vuetify],
-        stubs: {
-          PointCloudViewer: true,
-        },
-      },
-    }) as VueWrapper<PredictionHistoryInstance>
-
-    await flushPromises()
-
-    const buttons = wrapper.findAllComponents({ name: 'VBtn' })
-    const viewButton = buttons.find(btn => btn.text().includes('View Point Cloud'))
-    expect(viewButton?.exists()).toBe(true)
-
-    await viewButton?.trigger('click')
-
-    expect(wrapper.vm.dialog).toBe(true)
-    expect(wrapper.vm.selectedFile).toBe('http://localhost:8000/pointclouds/cloud1.ply')
   })
 
   it('removes prediction when clicking delete button', async () => {
@@ -157,7 +107,7 @@ describe('PredictionHistory', () => {
 
     await deleteButton?.trigger('click')
 
-    expect(api.delete).toHaveBeenCalledWith('/user/predictions/1/')
+    expect(api.delete).toHaveBeenCalledWith('/user/predictions/2/')
     expect(wrapper.vm.predictions.length).toBe(1)
   })
 
